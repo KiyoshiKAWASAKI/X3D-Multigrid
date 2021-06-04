@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="cd4bf559-874f-4a4e-ac61-5e60908d8640" name="tellurak">
+        <fileTransfer rootFolder="/home/local/KHQ/jin.huang" accessType="SFTP" host="tellurak.kitware.com" port="22" sshConfigId="266a75db-6c87-47d7-b4e4-58cc0b8653b7" sshConfig="jin.huang@tellurak.kitware.com:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

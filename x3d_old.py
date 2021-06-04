@@ -4,7 +4,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pdb
+
 
 class SubBatchNorm3d(nn.Module):
     """ FROM SLOWFAST """
@@ -326,12 +326,12 @@ class ResNet(nn.Module):
 
         x = self.conv5(x)
         x = self.bn5(x)
-        base = self.relu(x)
+        x = self.relu(x)
 
-        x = self.avgpool(base)
+        x = self.avgpool(x)
 
-        feat = self.fc1(x)
-        x = self.relu(feat)
+        x = self.fc1(x)
+        x = self.relu(x)
 
         if self.task == 'class':
             x = x.squeeze(4).squeeze(3).squeeze(2) # B C
@@ -342,7 +342,7 @@ class ResNet(nn.Module):
             x = self.dropout(x)
             x = self.fc2(x).permute(0,2,1) # B C T
 
-        return x, feat, base
+        return x
 
 
 def replace_logits(self, n_classes):
