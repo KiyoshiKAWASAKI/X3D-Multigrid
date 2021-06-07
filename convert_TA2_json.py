@@ -109,10 +109,11 @@ def convert_TA2_to_json(train_csv_path, train_mode, video_dir_path, dst_json_pat
     dst_data = {}
     dst_data['database'] = {}
     train_database, val_database = {}, {}
+
     for k in range(len(train_csv_path)):
-        if train_mode[k] == 'ucf101':
+        if train_mode[0] == 'ucf101':
             labels, label_map = load_ucf_labels(train_csv_path[k])
-            train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[k], train_csv_path[k])
+            train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[0], train_csv_path[k])
             dst_data['labels'] = labels
         else:
             train_keys_, val_keys_, train_key_labels_, val_key_labels_ = convert_kinetics_to_dict(video_dir_path[k], train_csv_path[k], label_map)
@@ -153,7 +154,7 @@ def convert_TA2_to_json(train_csv_path, train_mode, video_dir_path, dst_json_pat
 
 
 if __name__ == '__main__':
-    dir_path = '/data/dawei.du/datasets/TA2_splits/' # Path of label directory
+    dir_path = '/data/jin.huang/ucf101_npy_json/' # Path of label directory
     dst_path = '/data/jin.huang/ucf101_npy_json/' # Directory path of dst json file.
     dst_json_path = dst_path + 'ucf101.json'
     # train_mode = ['ucf101', 'kinetics']
@@ -162,8 +163,11 @@ if __name__ == '__main__':
     video_path = ['/data/dawei.du/datasets/UCF101/'] # Path of video directory
     # video_path.append('/data/dawei.du/datasets/kinetics/')
 
-    train_csv_path = [dir_path + 'ucf101_train_knowns_revised.csv']
+    # train_csv_path = [dir_path + 'ucf101_train_knowns_revised.csv']
     # train_csv_path.append(dir_path + 'kinetics_train_knowns_revised.csv')
+    train_csv_path = [dir_path + 'trainlist01.csv']
+    train_csv_path.append(dir_path + 'trainlist02.csv')
+    train_csv_path.append(dir_path + 'trainlist03.csv')
 
     convert_TA2_to_json(train_csv_path, train_mode, video_path, dst_json_path)
 

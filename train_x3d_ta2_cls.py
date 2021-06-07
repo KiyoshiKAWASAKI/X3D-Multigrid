@@ -30,7 +30,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='3', type=str)
+parser.add_argument('-gpu', default='0', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
@@ -43,8 +43,14 @@ GPUS = 2
 
 X3D_VERSION = 'M'
 
-TA2_ROOT = '/data/dawei.du/datasets/TA2_splits'
-TA2_ANNO = '/data/jin.huang/TA2_splits/TA2_classification.json'
+# This is the root dir to the npy file
+TA2_ROOT = '/data/jin.huang/ucf101_npy_json/'
+# This is the path to json file
+TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ucf101.json'
+
+model_save_path = "/data/jin.huang/ucf101_models"
+
+# TODO: these need to be changed
 TA2_DATASET_SIZE = {'train':13446, 'val':1491}
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
@@ -77,11 +83,13 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
 
-    dataset = UCF101(anno, 'training', root, spatial_transform=train_spatial_transforms, frames=80, gamma_tau=gamma_tau, crops=1)
+    dataset = UCF101(anno, 'training', root, spatial_transform=train_spatial_transforms,
+                     frames=80, gamma_tau=gamma_tau, crops=1)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True,
                                             num_workers=12, pin_memory=True)
 
-    val_dataset = UCF101(anno, 'validation', root, spatial_transform=val_spatial_transforms, frames=80, gamma_tau=gamma_tau, crops=10)
+    val_dataset = UCF101(anno, 'validation', root, spatial_transform=val_spatial_transforms,
+                         frames=80, gamma_tau=gamma_tau, crops=10)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size//2, shuffle=False,
                                                 num_workers=12, pin_memory=True)
 
@@ -91,14 +99,17 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     print('Total iterations:', max_steps, 'Total epochs:', max_epochs)
     print('datasets created')
 
+    # TODO: why is n_class 400??
     x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION, n_classes=400, n_input_channels=3, dropout=0.5, base_bn_splits=1)
     load_ckpt = torch.load('models/x3d_multigrid_kinetics_fb_pretrained.pt')
     x3d.load_state_dict(load_ckpt['model_state_dict'])
-    save_model = 'models/x3d_ta2_rgb_sgd_'
-    x3d.replace_logits(88)
+    save_model = model_save_path + '/x3d_ta2_rgb_sgd_'
+    # TODO: what is replace_logits
+    # x3d.replace_logits(88)
+    x3d.replace_logits(101)
 
     if steps>0:
-        load_ckpt = torch.load('models/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
+        load_ckpt = torch.load(model_save_path + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
         x3d.load_state_dict(load_ckpt['model_state_dict'])
 
     x3d.cuda()
@@ -148,6 +159,9 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                 bar.update(i)
                 if phase == 'train':
                     inputs, labels = data
+                    print("Checking input and label size")
+                    print(inputs.shape)
+
                 else:
                     inputs, labels = data
                     b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
@@ -160,6 +174,10 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                     logits, _, _ = x3d(inputs)
                     logits = logits.squeeze(2) # B C
                     probs = F.sigmoid(logits)
+                    print("Check output size")
+                    print(logits.shape)
+                    print(probs.shape)
+
                 else:
                     with torch.no_grad():
                         logits, _, _ = x3d(inputs)
@@ -170,6 +188,7 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                     #logits = torch.mean(logits, 1)
                     probs = torch.max(probs, dim=1)[0]
                     logits = torch.max(logits, dim=1)[0]
+
 
                 cls_loss = criterion(logits, labels)
                 tot_cls_loss += cls_loss.item()
