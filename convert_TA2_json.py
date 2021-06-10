@@ -1,11 +1,26 @@
 # Original author: Dawei Du
-#
+# Modified by Jin Huang
+# Note on 06/10: only consider training process for now
+
+
+
 import json
 import os
 import pandas as pd
 import cv2
 from tqdm import trange
 import pdb
+
+
+
+def txt2csv(src, dst):
+    """
+
+    """
+    df = pd.read_csv(src, delimiter=' ')
+    df.to_csv(dst, index=False, header=False)
+
+
 
 
 def get_n_frames(video_path):
@@ -23,7 +38,43 @@ def get_n_frames(video_path):
 
 
 
+def process_txt2csv(src_txt_path, save_csv_path):
+    """
+    06/09
+    This is the function used to process partition files from
+    /data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/
+
+    Note: to match the original format, labels start from 1
+    """
+    # Load txt file
+    data = pd.read_csv(src_txt_path, names=["video"])
+
+    # Add a new column with label part only
+    data['label'] = data.video.str[:-12]
+    unique_keys = data.label.unique()
+
+    # Generate a dictionary for these keys
+    key_dict ={}
+    for i in range(len(unique_keys)):
+        key_dict[unique_keys[i]] = i+1
+
+    # Check all entries and assign labels
+    data["num_label"] = data["label"].map(key_dict)
+
+    # Remove index and word label columns
+    data_final = data[["video", "num_label"]]
+
+    # Save dataframe into csv without header and index
+    data_final.to_csv(save_csv_path, header=False, index=False)
+
+
+
+
 def convert_ucf_to_dict(dataset_path, csv_path):
+    """
+    Generate the keys and labels for training and validation
+    """
+
     data = pd.read_csv(csv_path, delimiter=',', header=None)
     train_keys, val_keys = [], []
     train_key_labels, val_key_labels = [], []
@@ -46,6 +97,8 @@ def convert_ucf_to_dict(dataset_path, csv_path):
             val_key_labels.append(class_name)        
 
     return train_keys, val_keys, train_key_labels, val_key_labels
+
+
 
 
 def load_ucf_labels(label_csv_path):
@@ -154,20 +207,39 @@ def convert_TA2_to_json(train_csv_path, train_mode, video_dir_path, dst_json_pat
 
 
 if __name__ == '__main__':
-    dir_path = '/data/jin.huang/ucf101_npy_json/' # Path of label directory
-    dst_path = '/data/jin.huang/ucf101_npy_json/' # Directory path of dst json file.
-    dst_json_path = dst_path + 'ucf101.json'
-    # train_mode = ['ucf101', 'kinetics']
+    # All paths
     train_mode = ['ucf101']
+    video_path = ['/data/dawei.du/datasets/UCF101/']
 
-    video_path = ['/data/dawei.du/datasets/UCF101/'] # Path of video directory
-    # video_path.append('/data/dawei.du/datasets/kinetics/')
+    dir_path = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/' #Path of label directory
+    dst_path = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/' # Directory path of dst json file.
+    dst_json_path = dst_path + '_partition_0.json'
 
-    # train_csv_path = [dir_path + 'ucf101_train_knowns_revised.csv']
-    # train_csv_path.append(dir_path + 'kinetics_train_knowns_revised.csv')
-    train_csv_path = [dir_path + 'trainlist01.csv']
-    train_csv_path.append(dir_path + 'trainlist02.csv')
-    train_csv_path.append(dir_path + 'trainlist03.csv')
 
-    convert_TA2_to_json(train_csv_path, train_mode, video_path, dst_json_path)
+    # For UCF101 NoveltySplits, convert txt to csv
+    train_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/seen_training_filelist_0.txt"
+    test_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/seen_test_filelist_0.txt"
+    test_unknown_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/unseen_filelist_0.txt"
+
+    train_known_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/train_known_0.csv"
+    test_known_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/test_known_0.csv"
+    test_unknown_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/test_unknown_0.csv"
+
+    # process_txt2csv(src_txt_path=train_known_txt_path,
+    #                 save_csv_path=train_known_csv_path)
+    #
+    # process_txt2csv(src_txt_path=test_known_txt_path,
+    #                 save_csv_path=test_known_csv_path)
+    #
+    # process_txt2csv(src_txt_path=test_unknown_txt_path,
+    #                 save_csv_path=test_unknown_csv_path)
+
+    # Generate training Json file
+    train_csv_path = [train_known_csv_path]
+    test_csv_path = []
+
+    convert_TA2_to_json(train_csv_path=train_csv_path,
+                        train_mode=train_mode,
+                        video_dir_path=video_path,
+                        dst_json_path=dst_json_path)
 
