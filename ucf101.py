@@ -83,9 +83,13 @@ def get_class_labels(data):
     class_labels_map = {}
     index = 0
 
+    print(data["labels"])
+
     for class_label in data['labels']:
         class_labels_map[class_label] = index
         index += 1
+
+    print(class_labels_map)
     return class_labels_map
 
 def get_video_names_and_annotations(data, subset):
@@ -94,7 +98,7 @@ def get_video_names_and_annotations(data, subset):
     for key, value in data['database'].items():
         this_subset = value['subset']
         if this_subset == subset:
-            label = value['annotations']['label']
+            # label = value['annotations']['label']
             video_names.append(key)
             annotations.append(value['annotations'])
     return video_names, annotations
@@ -106,12 +110,14 @@ def load_rgb_frames(image_dir, vid, start, num, stride, video_loader):
 
     return frames
 
-def make_dataset(split_file, split, root, num_classes=101):
+# def make_dataset(split_file, split, root, num_classes=101):
+def make_dataset(split_file, split, root, num_classes=26):
     dataset = []
     with open(split_file, 'r') as f:
         data = json.load(f)
     video_names, annotations = get_video_names_and_annotations(data, split)
     class_to_idx = get_class_labels(data)
+
     idx_to_class = {}
     for name, label in class_to_idx.items():
         idx_to_class[label] = name
@@ -128,14 +134,12 @@ def make_dataset(split_file, split, root, num_classes=101):
             video_path = video_names[i]
             if not os.path.exists(video_path):
                 continue
+
             num_frames = int(data['database'][video_names[i]]['annotations']['segment'][1])
             if num_frames > 0:
                 num_frames = max(2*80+2, num_frames)
-                # print(num_frames)
             else:
                 continue
-
-            # num_classes = 88
 
             label = np.zeros((num_classes,num_frames), np.float32)
             cur_class_idx = class_to_idx[annotations[i]['label']]
@@ -150,7 +154,16 @@ def make_dataset(split_file, split, root, num_classes=101):
 
 class UCF101(data_utl.Dataset):
 
-    def __init__(self, split_file, split, root, num_classes=101, spatial_transform=None, task='class', frames=80, gamma_tau=5, crops=1):
+    def __init__(self,
+                 split_file,
+                 split, root,
+                 # num_classes=101,
+                 num_classes=26,
+                 spatial_transform=None,
+                 task='class',
+                 frames=80,
+                 gamma_tau=5,
+                 crops=1):
 
         self.data = make_dataset(split_file, split, root, num_classes)
         self.split_file = split_file
@@ -195,10 +208,11 @@ class UCF101(data_utl.Dataset):
             imgs_l = [self.spatial_transform(Image.fromarray(img)) for img in imgs]
         imgs_l = torch.stack(imgs_l, 0).permute(1, 0, 2, 3) # T C H W --> C T H W
 
-        print("@" * 20)
-        print(imgs_l.shape)
+        # print("@" * 20)
+        # print(imgs_l.shape)
 
         if self.split == 'validation' and self.task == 'class': #self.crops > 1:
+            print(imgs_l.shape[1])
             step = int((imgs_l.shape[1] - 1 - self.frames//self.gamma_tau)//(self.crops-1))
             if step == 0:
                 clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
@@ -213,7 +227,6 @@ class UCF101(data_utl.Dataset):
         else:
             clips = imgs_l
 
-        print("@" * 20)
 
         return clips, label
 
