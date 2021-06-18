@@ -152,13 +152,13 @@ def make_dataset(split_file, split, root, num_classes=26):
     return dataset
 
 
-class UCF101(data_utl.Dataset):
+class customized_dataset(data_utl.Dataset):
 
     def __init__(self,
                  split_file,
-                 split, root,
-                 # num_classes=101,
-                 num_classes=26,
+                 split,
+                 root,
+                 num_classes,
                  spatial_transform=None,
                  task='class',
                  frames=80,
@@ -217,13 +217,13 @@ class UCF101(data_utl.Dataset):
             if step == 0:
                 clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
                 clips = torch.stack(clips, 0)
-                print("clips when step == 0")
-                print(clips.shape)
+                # print("clips when step == 0")
+                # print(clips.shape)
             else:
                 clips = [imgs_l[:,i:i+self.frames//self.gamma_tau,...] for i in range(0, step*self.crops, step)]
                 clips = torch.stack(clips, 0)
-                print("clips when step != 0")
-                print(clips.shape)
+                # print("clips when step != 0")
+                # print(clips.shape)
         else:
             clips = imgs_l
 
