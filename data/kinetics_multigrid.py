@@ -10,8 +10,6 @@ import copy
 import numpy as np
 import random
 
-import cycle_batch_sampler as cbs
-
 
 def load_value_file(file_path):
     with open(file_path, 'r') as input_file:

@@ -5,26 +5,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
 
-import torchvision
-from torchvision import datasets, transforms
-from torchsummary import summary
-
-import numpy as np
-from barbar import Bar
 import pkbar
-from apmeter import APMeter
+from utils.apmeter import APMeter
 
 import x3d as resnet_x3d
 
-from charades import Charades
-from charades import custom_collate_fn as collate_fn
+from data.charades import Charades
+from data.charades import custom_collate_fn as collate_fn
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, MultiScaleRandomCropMultigrid, ToTensor, CenterCrop, CenterCropScaled
-from transforms.temporal_transforms import TemporalRandomCrop
-from transforms.target_transforms import ClassLabel
+from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCropMultigrid, ToTensor, \
+    CenterCropScaled
 
 import warnings
 warnings.filterwarnings("ignore")

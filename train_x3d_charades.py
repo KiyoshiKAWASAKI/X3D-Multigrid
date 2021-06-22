@@ -15,11 +15,11 @@ from torchsummary import summary
 import numpy as np
 from barbar import Bar
 import pkbar
-from apmeter import APMeter
+from utils.apmeter import APMeter
 
 import x3d as resnet_x3d
 
-from charades import Charades
+from data.charades import Charades
 
 from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, MultiScaleRandomCropMultigrid, ToTensor, CenterCrop, CenterCropScaled
 from transforms.temporal_transforms import TemporalRandomCrop

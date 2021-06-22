@@ -18,7 +18,7 @@ from torch._six import queue, string_classes
 from torch.utils.data import IterableDataset, Sampler, SequentialSampler, RandomSampler, BatchSampler
 from torch.utils.data import _utils
 
-import worker
+from utils import worker
 
 get_worker_info = _utils.worker.get_worker_info
 

@@ -27,9 +27,9 @@ class Compose(object):
             img = t(img)
         return img
 
-    def randomize_parameters(self, c_size=0):
-        for t in self.transforms:
-            t.randomize_parameters(c_size)
+    # def randomize_parameters(self, c_size=0):
+    #     for t in self.transforms:
+    #         t.randomize_parameters(c_size)
 
 
 class ToTensor(object):
@@ -338,6 +338,8 @@ class RandomHorizontalFlip(object):
         Returns:
             PIL.Image: Randomly flipped image.
         """
+        self.p = random.random()
+
         if self.p < 0.5:
             if isinstance(img, np.ndarray):
                 return np.fliplr(img).copy()
@@ -345,8 +347,8 @@ class RandomHorizontalFlip(object):
                 return img.transpose(Image.FLIP_LEFT_RIGHT)
         return img
 
-    def randomize_parameters(self, c_size=0):
-        self.p = random.random()
+    # def randomize_parameters(self, c_size=0):
+    #     self.p = random.random()
 
 
 class RandomVerticalFlip(object):
@@ -476,6 +478,10 @@ class MultiScaleRandomCropMultigrid(object):
         self.init_size = size
         self.size = self.init_size
         self.interpolation = interpolation
+        self.size = size
+        self.scale = random.randint(0, len(self.scales) - 1)
+        self.tl_x = random.random()
+        self.tl_y = random.random()
 
     def __call__(self, img):
 
@@ -494,8 +500,8 @@ class MultiScaleRandomCropMultigrid(object):
 
         return img.resize((self.size, self.size), self.interpolation)
 
-    def randomize_parameters(self, c_size):
-        self.size = c_size
-        self.scale = self.scales[random.randint(0, len(self.scales) - 1)]
-        self.tl_x = random.random()
-        self.tl_y = random.random()
+    # def randomize_parameters(self, c_size):
+    #     self.size = c_size
+    #     self.scale = self.scales[random.randint(0, len(self.scales) - 1)]
+    #     self.tl_x = random.random()
+    #     self.tl_y = random.random()

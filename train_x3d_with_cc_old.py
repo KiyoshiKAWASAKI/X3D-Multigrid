@@ -1,42 +1,38 @@
+# Training X3D with contrastive loss
+# Modified based on X3D authors' and Dawei's code and original X3D by Jin Huang
+
 import os
 import argparse
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
-
-import torchvision
-from torchvision import datasets, transforms
-from torchsummary import summary
-
-import numpy as np
-from barbar import Bar
 import pkbar
-from utils.apmeter import APMeter
-
-import x3d as resnet_x3d
-
-from data.ucf101 import UCF101
-
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, MultiScaleRandomCropMultigrid, ToTensor, CenterCrop, CenterCropScaled
-from transforms.temporal_transforms import TemporalRandomCrop
-from transforms.target_transforms import ClassLabel
-import pdb
-
 import warnings
-warnings.filterwarnings("ignore")
+import x3d as resnet_x3d
+import torchvision
 
+from utils import contrastive_loss
+from utils.apmeter import APMeter
+from data.ucf101 import customized_dataset
+from utils.transform import Transforms
+from transforms.spatial_transforms import Compose, Normalize, \
+    RandomHorizontalFlip, MultiScaleRandomCropMultigrid, ToTensor, \
+    CenterCropScaled
+
+warnings.filterwarnings("ignore")
 parser = argparse.ArgumentParser()
 parser.add_argument('-gpu', default='0', type=str)
-
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 
 
-BS = 16
+
+###############################################################
+# TODO: Organize this part for multiple dataset setting...
+###############################################################
+BS = 8
+s=0.5
 BS_UPSCALE = 2
 INIT_LR = 0.02 * BS_UPSCALE
 GPUS = 2
@@ -44,19 +40,41 @@ GPUS = 2
 X3D_VERSION = 'M'
 
 # This is the root dir to the npy file
-TA2_ROOT = '/data/jin.huang/ucf101_npy_json/'
-# This is the path to json file
-TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ucf101.json'
+# TA2_ROOT = '/data/jin.huang/ucf101_npy_json/'
+TA2_ROOT = '/data/jin.huang/hmdb51/npy_json/0'
 
-model_save_path = "/data/jin.huang/ucf101_models"
+# This is the path to json file
+# TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ucf101.json'
+TA2_ANNO = '/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json'
+
+# model_save_path = "/data/jin.huang/ucf101_models"
+model_save_path = "/data/jin.huang/hmdb51_models/0614_x3d_p0"
 
 # TODO: these need to be changed
-TA2_DATASET_SIZE = {'train':13446, 'val':1491}
+# TA2_DATASET_SIZE = {'train':13446, 'val':1491}
+TA2_DATASET_SIZE = {'train':1906, 'val':212}
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
-# warmup_steps=0
-def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_size=BS*BS_UPSCALE):
+
+###############################################################
+# TODO: Define the dataloaders here
+###############################################################
+
+
+
+
+
+
+###############################################################
+# TODO: Main function for training and validation
+###############################################################
+
+def run(init_lr=INIT_LR,
+        max_epochs=1,
+        root=TA2_ROOT,
+        anno=TA2_ANNO,
+        batch_size=BS*BS_UPSCALE):
 
     frames=80 # DOUBLED INSIDE DATASET, AS LONGER CLIPS
     crop_size = {'S':160, 'M':224, 'XL':312}[X3D_VERSION]
@@ -73,25 +91,51 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     val_iterations_per_epoch = TA2_DATASET_SIZE['val']//(batch_size//2)
     max_steps = iterations_per_epoch * max_epochs
 
+    # img_shape = [3, 16, 224, 224]
+    # data_augmentation = Transforms(size=img_shape, s=0.5)
 
     train_spatial_transforms = Compose([MultiScaleRandomCropMultigrid([crop_size/i for i in resize_size], crop_size),
                                         RandomHorizontalFlip(),
+                                        torchvision.transforms.RandomApply(
+                                            [torchvision.transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)],
+                                            p=0.8),
+                                        torchvision.transforms.RandomGrayscale(p=0.2),
                                         ToTensor(255),
-                                        Normalize(TA2_MEAN, TA2_STD)])
+                                        Normalize(TA2_MEAN, TA2_STD),])
 
     val_spatial_transforms = Compose([CenterCropScaled(crop_size),
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
 
-    dataset = UCF101(anno, 'training', root, spatial_transform=train_spatial_transforms,
-                     frames=80, gamma_tau=gamma_tau, crops=1)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                                            num_workers=12, pin_memory=True)
+    dataset = customized_dataset(split_file=anno,
+                                 split='training',
+                                 root=root,
+                                 num_classes=26,
+                                 spatial_transform=train_spatial_transforms,
+                                 frames=80,
+                                 gamma_tau=gamma_tau,
+                                 crops=1)
 
-    val_dataset = UCF101(anno, 'validation', root, spatial_transform=val_spatial_transforms,
-                         frames=80, gamma_tau=gamma_tau, crops=10)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size//2, shuffle=False,
-                                                num_workers=12, pin_memory=True)
+    dataloader = torch.utils.data.DataLoader(dataset,
+                                             batch_size=batch_size,
+                                             shuffle=True,
+                                             num_workers=12,
+                                             pin_memory=True)
+
+
+    val_dataset = customized_dataset(split_file=anno,
+                                     split='validation',
+                                     root=root,
+                                     num_classes=26,
+                                     spatial_transform=val_spatial_transforms,
+                                     frames=80,
+                                     gamma_tau=gamma_tau,
+                                     crops=10)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset,
+                                                 batch_size=batch_size//2,
+                                                 shuffle=False,
+                                                 num_workers=12,
+                                                 pin_memory=True)
 
     dataloaders = {'train': dataloader, 'val': val_dataloader}
     datasets = {'train': dataset, 'val': val_dataset}
@@ -99,14 +143,15 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     print('Total iterations:', max_steps, 'Total epochs:', max_epochs)
     print('datasets created')
 
-    # TODO: why is n_class 400??
     x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION, n_classes=400, n_input_channels=3, dropout=0.5, base_bn_splits=1)
     load_ckpt = torch.load('models/x3d_multigrid_kinetics_fb_pretrained.pt')
     x3d.load_state_dict(load_ckpt['model_state_dict'])
     save_model = model_save_path + '/x3d_ta2_rgb_sgd_'
-    # TODO: what is replace_logits
+
+    # TODO: change here for different number of class in our dataset
     # x3d.replace_logits(88)
-    x3d.replace_logits(101)
+    # x3d.replace_logits(101)
+    x3d.replace_logits(26)
 
     if steps>0:
         load_ckpt = torch.load(model_save_path + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
@@ -131,6 +176,7 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     val_apm = APMeter()
     tr_apm = APMeter()
     best_map = 0
+
     while epochs < max_epochs:
         print ('Step {} Epoch {}'.format(steps, epochs))
         print ('-' * 10)
@@ -138,13 +184,14 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
         for phase in ['train']+['val']:
             bar_st = iterations_per_epoch if phase == 'train' else val_iterations_per_epoch
             bar = pkbar.Pbar(name='update: ', target=bar_st)
+
             if phase == 'train':
                 x3d.train(True)
                 epochs += 1
                 torch.autograd.set_grad_enabled(True)
             else:
-                x3d.train(False)  # Set model to evaluate mode
-                _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS
+                x3d.train(False)
+                _ = x3d.module.aggregate_sub_bn_stats()
                 torch.autograd.set_grad_enabled(False)
 
             tot_loss = 0.0
@@ -158,51 +205,59 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                 num_iter += 1
                 bar.update(i)
                 if phase == 'train':
-                    inputs, labels = data
-                    print("Checking input and label size")
-                    print(inputs.shape)
+                    # TODO: Get 2 augmented input here
+                    inputs_a, inputs_b, labels = data
+
+                    inputs_a = inputs_a.cuda()  # B 3 T W H
+                    inputs_b = inputs_b.cuda()
+                    labels = labels.cuda()  # B C
+
+                    # TODO: Two augmented images sent into a same X3D and gets two feature maps ha and hb
+                    logits_a, _, _ = x3d(inputs_a)
+                    logits_a = logits_a.squeeze(2)
+                    probs = F.sigmoid(logits_a)
+
+                    logits_b, _, _ = x3d(inputs_b)
+                    logits_b = logits_b.squeeze(2)
+                    probs_b = F.sigmoid(logits_b)
+
+                    # TODO: Send ha and hb into 2 MLP respectively
+                    # TODO: MLP1: does not have SoftMax, produces feature maps za and zb
+                    # TODO: MLP2: has a SoftMax, produces soft labels ya and yb
+
 
                 else:
                     inputs, labels = data
                     b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
                     inputs = inputs.view(b*n,c,t,h,w)
 
-                inputs = inputs.cuda() # B 3 T W H
-                labels = labels.cuda() # B C
+                    inputs = inputs.cuda() # B 3 T W H
+                    labels = labels.cuda() # B C
 
-                if phase == 'train':
-                    logits, _, _ = x3d(inputs)
-                    logits = logits.squeeze(2) # B C
-                    probs = F.sigmoid(logits)
-                    print("Check output size")
-                    print(logits.shape)
-                    print(probs.shape)
-
-                else:
                     with torch.no_grad():
                         logits, _, _ = x3d(inputs)
                     logits = logits.squeeze(2) # B C
                     logits = logits.view(b,n,logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
                     probs = F.sigmoid(logits)
-                    #probs = torch.mean(probs, 1)
-                    #logits = torch.mean(logits, 1)
                     probs = torch.max(probs, dim=1)[0]
                     logits = torch.max(logits, dim=1)[0]
 
+                # TODO: maximize similarity between za and zb
+                # TODO: Supervised learning for ya and yb
+                # TODO(Q): is it necessary to maximize similarity for ya and yb too?
 
                 cls_loss = criterion(logits, labels)
                 tot_cls_loss += cls_loss.item()
 
-                if phase == 'train':
-                    tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
-                else:
-                    val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
-
-                loss = cls_loss/num_steps_per_update
+                loss = cls_loss / num_steps_per_update
                 tot_loss += loss.item()
 
                 if phase == 'train':
+                    tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
                     loss.backward()
+                else:
+                    val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+
 
                 if num_iter == num_steps_per_update and phase == 'train':
                     #lr_warmup(lr, steps-st_steps, warmup_steps, optimizer)

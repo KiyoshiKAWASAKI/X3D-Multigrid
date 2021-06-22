@@ -5,28 +5,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
 
-import torchvision
-from torchvision import datasets, transforms
-from torchsummary import summary
-
-import numpy as np
 import pkbar
-from apmeter import APMeter
 
 import x3d as resnet_x3d
 
-from kinetics_multigrid import Kinetics
-from kinetics import Kinetics as Kinetics_val
+from data.kinetics_multigrid import Kinetics
+from data.kinetics import Kinetics as Kinetics_val
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, MultiScaleRandomCropMultigrid, ToTensor, CenterCrop, CenterCropScaled
+from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCropMultigrid, ToTensor, \
+    CenterCropScaled
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
 
-import cycle_batch_sampler as cbs
-import dataloader as DL
+from utils import cycle_batch_sampler as cbs
+from data import dataloader as DL
 
 import warnings
 warnings.filterwarnings("ignore")

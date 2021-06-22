@@ -15,6 +15,7 @@ import torchvision
 from PIL import Image
 import pdb
 import cv2
+from utils.transform import Transforms
 
 
 def pil_loader(path):
@@ -83,13 +84,13 @@ def get_class_labels(data):
     class_labels_map = {}
     index = 0
 
-    print(data["labels"])
+    # print(data["labels"])
 
     for class_label in data['labels']:
         class_labels_map[class_label] = index
         index += 1
 
-    print(class_labels_map)
+    # print(class_labels_map)
     return class_labels_map
 
 def get_video_names_and_annotations(data, subset):
@@ -159,11 +160,12 @@ class customized_dataset(data_utl.Dataset):
                  split,
                  root,
                  num_classes,
-                 spatial_transform=None,
                  task='class',
                  frames=80,
                  gamma_tau=5,
-                 crops=1):
+                 crops=1,
+                 spatial_transform=None,
+                 data_augmentation=None):
 
         self.data = make_dataset(split_file, split, root, num_classes)
         self.split_file = split_file
@@ -175,6 +177,7 @@ class customized_dataset(data_utl.Dataset):
         self.crops = crops
         self.split = split
         self.task = task
+        self.data_augmentation = data_augmentation
 
     def __getitem__(self, index):
         """
@@ -199,36 +202,39 @@ class customized_dataset(data_utl.Dataset):
         imgs = load_rgb_frames(self.root, vid, start_f, frames, stride_f, self.loader)
         label = label[:, start_f-1:start_f-1+frames:1] #stride_f
         label = torch.from_numpy(label)
+
         if self.task == 'class':
             label = torch.max(label, dim=1)[0] # C T --> C
 
-        if self.spatial_transform is not None:
-            # print(self.spatial_transform )
-            self.spatial_transform.randomize_parameters(224)
-            imgs_l = [self.spatial_transform(Image.fromarray(img)) for img in imgs]
-        imgs_l = torch.stack(imgs_l, 0).permute(1, 0, 2, 3) # T C H W --> C T H W
+        assert (self.spatial_transform != None)
+        # self.spatial_transform.randomize_parameters(224)
+        # imgs_l = [self.spatial_transform(Image.fromarray(img)) for img in imgs]
 
-        # print("@" * 20)
-        # print(imgs_l.shape)
+        # if self.data_augmentation != None:
+        img_list_a = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
+        img_list_b = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
+
+        img_list_a = torch.stack(img_list_a, 0).permute(1, 0, 2, 3)  # T C H W --> C T H W
+        img_list_b = torch.stack(img_list_b, 0).permute(1, 0, 2, 3)
+
 
         if self.split == 'validation' and self.task == 'class': #self.crops > 1:
-            print(imgs_l.shape[1])
-            step = int((imgs_l.shape[1] - 1 - self.frames//self.gamma_tau)//(self.crops-1))
-            if step == 0:
-                clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
-                clips = torch.stack(clips, 0)
-                # print("clips when step == 0")
-                # print(clips.shape)
-            else:
-                clips = [imgs_l[:,i:i+self.frames//self.gamma_tau,...] for i in range(0, step*self.crops, step)]
-                clips = torch.stack(clips, 0)
-                # print("clips when step != 0")
-                # print(clips.shape)
+            # print(imgs_l.shape[1])
+            # step = int((imgs_l.shape[1] - 1 - self.frames//self.gamma_tau)//(self.crops-1))
+            # if step == 0:
+            #     clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
+            #     clips = torch.stack(clips, 0)
+            # else:
+            #     clips = [imgs_l[:,i:i+self.frames//self.gamma_tau,...] for i in range(0, step*self.crops, step)]
+            #     clips = torch.stack(clips, 0)
+            # TODO: what to do with validation??
+            clips_a = None
+            clips_b = None
         else:
-            clips = imgs_l
+            clips_a = img_list_a
+            clips_b = img_list_b
 
-
-        return clips, label
+        return clips_a, clips_b, label
 
     def __len__(self):
         return len(self.data)
