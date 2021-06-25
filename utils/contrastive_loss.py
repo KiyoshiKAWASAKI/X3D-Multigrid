@@ -23,21 +23,44 @@ class InstanceLoss(nn.Module):
         mask = mask.bool()
         return mask
 
-    def forward(self, z_i, z_j):
+    # def forward(self, z_i, z_j):
+    #     N = 2 * self.batch_size
+    #     z = torch.cat((z_i, z_j), dim=0)
+    #
+    #     sim = torch.matmul(z, z.T) / self.temperature
+    #     sim_i_j = torch.diag(sim, self.batch_size)
+    #     sim_j_i = torch.diag(sim, -self.batch_size)
+    #
+    #     positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
+    #     negative_samples = sim[self.mask].reshape(N, -1)
+    #
+    #     labels = torch.zeros(N).to(positive_samples.device).long()
+    #     logits = torch.cat((positive_samples, negative_samples), dim=1)
+    #     loss = self.criterion(logits, labels)
+    #     loss /= N
+    #
+    #     return loss
+
+    def forward(self, z_i, z_j, labels):
         N = 2 * self.batch_size
-        z = torch.cat((z_i, z_j), dim=0)
+        # z = torch.cat((z_i, z_j), dim=0)
+        #
+        # sim = torch.matmul(z, z.T) / self.temperature
+        # sim_i_j = torch.diag(sim, self.batch_size)
+        # sim_j_i = torch.diag(sim, -self.batch_size)
+        #
+        # positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
+        # negative_samples = sim[self.mask].reshape(N, -1)
+        #
+        # labels = torch.zeros(N).to(positive_samples.device).long()
+        # logits = torch.cat((positive_samples, negative_samples), dim=1)
+        z_i_cuda = z_i.to(self.device)
+        z_j_cuda = z_j.to(self.device)
 
-        sim = torch.matmul(z, z.T) / self.temperature
-        sim_i_j = torch.diag(sim, self.batch_size)
-        sim_j_i = torch.diag(sim, -self.batch_size)
+        loss_i = self.criterion(z_i_cuda, labels)
+        loss_j = self.criterion(z_j_cuda, labels)
 
-        positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
-        negative_samples = sim[self.mask].reshape(N, -1)
-
-        labels = torch.zeros(N).to(positive_samples.device).long()
-        logits = torch.cat((positive_samples, negative_samples), dim=1)
-        loss = self.criterion(logits, labels)
-        loss /= N
+        loss = (loss_i + loss_j)/N
 
         return loss
 

@@ -11,6 +11,7 @@ import pkbar
 import warnings
 import x3d as resnet_x3d
 import torchvision
+import mlp_network
 
 from utils import contrastive_loss
 from utils.apmeter import APMeter
@@ -36,6 +37,9 @@ s=0.5
 BS_UPSCALE = 2
 INIT_LR = 0.02 * BS_UPSCALE
 GPUS = 2
+
+instance_temperature = 0.5
+cluster_temperature = 1.0
 
 X3D_VERSION = 'M'
 
@@ -148,6 +152,10 @@ def run(init_lr=INIT_LR,
     x3d.load_state_dict(load_ckpt['model_state_dict'])
     save_model = model_save_path + '/x3d_ta2_rgb_sgd_'
 
+    # TODO: Create MLP model
+    mlp_model = mlp_network.mlp_network(feature_dim=26,
+                                        class_num=26)
+
     # TODO: change here for different number of class in our dataset
     # x3d.replace_logits(88)
     # x3d.replace_logits(101)
@@ -174,8 +182,11 @@ def run(init_lr=INIT_LR,
     criterion = nn.BCEWithLogitsLoss()
 
     val_apm = APMeter()
-    tr_apm = APMeter()
+    tr_apm_a = APMeter()
+    tr_apm_b = APMeter()
+
     best_map = 0
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     while epochs < max_epochs:
         print ('Step {} Epoch {}'.format(steps, epochs))
@@ -196,6 +207,7 @@ def run(init_lr=INIT_LR,
 
             tot_loss = 0.0
             tot_cls_loss = 0.0
+            total_instance_loss = 0.0
             num_iter = 0
             optimizer.zero_grad()
 
@@ -208,24 +220,75 @@ def run(init_lr=INIT_LR,
                     # TODO: Get 2 augmented input here
                     inputs_a, inputs_b, labels = data
 
-                    inputs_a = inputs_a.cuda()  # B 3 T W H
-                    inputs_b = inputs_b.cuda()
-                    labels = labels.cuda()  # B C
+                    inputs_a = inputs_a.to(device)  # B 3 T W H
+                    inputs_b = inputs_b.to(device)
+                    labels = labels.to(device)  # B C
 
-                    # TODO: Two augmented images sent into a same X3D and gets two feature maps ha and hb
+                    # TODO: Two augmented images sent into a same X3D
+                    #  and gets two feature maps ha and hb
                     logits_a, _, _ = x3d(inputs_a)
                     logits_a = logits_a.squeeze(2)
-                    probs = F.sigmoid(logits_a)
+                    # probs = F.sigmoid(logits_a)
 
                     logits_b, _, _ = x3d(inputs_b)
                     logits_b = logits_b.squeeze(2)
-                    probs_b = F.sigmoid(logits_b)
+                    # probs_b = F.sigmoid(logits_b)
+
+                    # print(logits_a.shape)
+                    # print(probs.shape)
+
+                    # logit shape: [16, 26] ([batch_size, nb_classes])
+                    # probs shape: [16, 26] ([batch_size, nb_classes])
 
                     # TODO: Send ha and hb into 2 MLP respectively
                     # TODO: MLP1: does not have SoftMax, produces feature maps za and zb
                     # TODO: MLP2: has a SoftMax, produces soft labels ya and yb
+                    z_a, z_b, y_a, y_b = mlp_model(logits_a, logits_b)
+                    # shape of z_a, z_b, y_a, y_b: [batch_size, nb_classes]
 
 
+                    # loss_device = torch.device("cuda")
+                    # loss_device = torch.cuda.set_device(1)
+
+                    # TODO: Unsupervised loss - maximize similarity between za and zb
+                    criterion_cluster = contrastive_loss.ClusterLoss(26,
+                                                                     cluster_temperature,
+                                                                     device).to(device)
+                    cluster_loss = criterion_cluster(z_a, z_b)
+
+                    # # TODO: Normal supervised learning for ya and yb
+                    # # TODO(Q): is it necessary to maximize similarity for ya and yb too?
+                    criterion_instance = contrastive_loss.InstanceLoss(batch_size,
+                                                                       instance_temperature,
+                                                                       device).to(device)
+                    instance_loss = criterion_instance(y_a, y_b, labels)
+
+                    # ya and yb are logits (modified)
+                    # instance_loss_a = criterion(y_a.to(loss_device), labels)
+                    # instance_loss_b = criterion(y_b.to(loss_device), labels)
+
+                    # z_a = z_a.to(device)
+                    # z_b.to(device)
+                    # y_a.to(device)
+                    # y_b.to(device)
+
+                    instance_loss_a = criterion(y_a, labels)
+                    instance_loss_b = criterion(y_b, labels)
+
+                    total_instance_loss += instance_loss_a.item()
+                    total_instance_loss += instance_loss_b.item()
+
+                    loss = cluster_loss + instance_loss_a + instance_loss_b
+
+                    probs_a = y_a
+                    probs_b = y_b
+
+                    tr_apm_a.add(probs_a.detach().cpu().numpy(), labels.cpu().numpy())
+                    tr_apm_b.add(probs_b.detach().cpu().numpy(), labels.cpu().numpy())
+
+                    loss.backward()
+
+                # TODO: fix the validation phase later
                 else:
                     inputs, labels = data
                     b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
@@ -242,19 +305,18 @@ def run(init_lr=INIT_LR,
                     probs = torch.max(probs, dim=1)[0]
                     logits = torch.max(logits, dim=1)[0]
 
-                # TODO: maximize similarity between za and zb
-                # TODO: Supervised learning for ya and yb
-                # TODO(Q): is it necessary to maximize similarity for ya and yb too?
-
-                cls_loss = criterion(logits, labels)
-                tot_cls_loss += cls_loss.item()
-
-                loss = cls_loss / num_steps_per_update
-                tot_loss += loss.item()
+                # cls_loss = criterion(logits, labels)
+                # tot_cls_loss += cls_loss.item()
+                #
+                # loss = cls_loss / num_steps_per_update
+                # tot_loss += loss.item()
 
                 if phase == 'train':
-                    tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
-                    loss.backward()
+                    # tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+                    # tr_apm_a.add(probs_a.detach().cpu().numpy(), labels.cpu().numpy())
+                    # tr_apm_b.add(probs_b.detach().cpu().numpy(), labels.cpu().numpy())
+                    # loss.backward()
+                    pass
                 else:
                     val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
@@ -267,11 +329,23 @@ def run(init_lr=INIT_LR,
                     optimizer.zero_grad()
                     s_times = iterations_per_epoch//2
                     if (steps-load_steps) % s_times == 0:
-                        tr_map = tr_apm.value().mean()
-                        tr_apm.reset()
-                        print (' Epoch:{} {} steps: {} Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
-                            steps, tot_cls_loss/(s_times*num_steps_per_update), tot_loss/s_times, tr_map))#, tot_acc/(s_times*num_steps_per_update)))
-                        tot_loss = tot_cls_loss = 0.
+                        tr_map_a = tr_apm_a.value().mean()
+                        tr_map_b = tr_apm_a.value().mean()
+
+                        tr_map_a.reset()
+                        tr_map_b.reset()
+
+                        print('Epoch (training):{} '
+                              'Cls Loss: {:.4f} '
+                              'mAP branch a: {:.4f} '
+                              'mAP branch a: {:.4f} '.format(epochs,
+                                                      loss,
+                                                      tr_map_a,
+                                                      tr_map_b))
+
+                        # print (' Epoch:{} {} steps: {} Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
+                        #     steps, tot_cls_loss/(s_times*num_steps_per_update), tot_loss/s_times, tr_map))#, tot_acc/(s_times*num_steps_per_update)))
+                        # tot_loss = tot_cls_loss = 0.
                     '''if steps % (1000) == 0:
                         ckpt = {'model_state_dict': x3d.module.state_dict(),
                                 'optimizer_state_dict': optimizer.state_dict(),
@@ -279,20 +353,21 @@ def run(init_lr=INIT_LR,
                         torch.save(ckpt, save_model+str(steps).zfill(6)+'.pt')'''
 
             if phase == 'val':
-                val_map = val_apm.value().mean()
-                lr_sched.step(tot_loss)
-                val_apm.reset()
-                print (' Epoch:{} {} Loc Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
-                    tot_cls_loss/num_iter, (tot_loss*num_steps_per_update)/num_iter, val_map))
-                tot_loss = tot_cls_loss = 0.
-                if val_map > best_map:
-                    ckpt = {'model_state_dict': x3d.module.state_dict(),
-                            'optimizer_state_dict': optimizer.state_dict(),
-                            'scheduler_state_dict': lr_sched.state_dict()}
-                    best_map = val_map
-                    best_epoch = epochs
-                    print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
-                    torch.save(ckpt, save_model+'best.pt')
+                pass
+                # val_map = val_apm.value().mean()
+                # lr_sched.step(tot_loss)
+                # val_apm.reset()
+                # print (' Epoch:{} {} Loc Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
+                #     tot_cls_loss/num_iter, (tot_loss*num_steps_per_update)/num_iter, val_map))
+                # tot_loss = tot_cls_loss = 0.
+                # if val_map > best_map:
+                #     ckpt = {'model_state_dict': x3d.module.state_dict(),
+                #             'optimizer_state_dict': optimizer.state_dict(),
+                #             'scheduler_state_dict': lr_sched.state_dict()}
+                #     best_map = val_map
+                #     best_epoch = epochs
+                #     print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
+                #     torch.save(ckpt, save_model+'best.pt')
 
 def lr_warmup(init_lr, cur_steps, warmup_steps, opt):
     start_after = 1
