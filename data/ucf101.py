@@ -164,6 +164,7 @@ class customized_dataset(data_utl.Dataset):
                  frames=80,
                  gamma_tau=5,
                  crops=1,
+                 use_contrastive_loss= False,
                  spatial_transform=None,
                  data_augmentation=None):
 
@@ -178,6 +179,7 @@ class customized_dataset(data_utl.Dataset):
         self.split = split
         self.task = task
         self.data_augmentation = data_augmentation
+        self.use_contrastive_loss = use_contrastive_loss
 
     def __getitem__(self, index):
         """
@@ -207,34 +209,47 @@ class customized_dataset(data_utl.Dataset):
             label = torch.max(label, dim=1)[0] # C T --> C
 
         assert (self.spatial_transform != None)
-        # self.spatial_transform.randomize_parameters(224)
-        # imgs_l = [self.spatial_transform(Image.fromarray(img)) for img in imgs]
 
-        # if self.data_augmentation != None:
-        img_list_a = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
-        img_list_b = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
+        # When training with contrastive loss
+        if self.use_contrastive_loss:
+            img_list_a = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
+            img_list_b = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
 
-        img_list_a = torch.stack(img_list_a, 0).permute(1, 0, 2, 3)  # T C H W --> C T H W
-        img_list_b = torch.stack(img_list_b, 0).permute(1, 0, 2, 3)
+            img_list_a = torch.stack(img_list_a, 0).permute(1, 0, 2, 3)  # T C H W --> C T H W
+            img_list_b = torch.stack(img_list_b, 0).permute(1, 0, 2, 3)
 
+            if self.split == 'validation' and self.task == 'class':  # self.crops > 1:
+                clips_a = [img_list_a[:, :self.frames // self.gamma_tau, ...]]
+                clips_b = [img_list_b[:, :self.frames // self.gamma_tau, ...]]
 
-        if self.split == 'validation' and self.task == 'class': #self.crops > 1:
-            # print(imgs_l.shape[1])
-            # step = int((imgs_l.shape[1] - 1 - self.frames//self.gamma_tau)//(self.crops-1))
-            # if step == 0:
-            #     clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
-            #     clips = torch.stack(clips, 0)
-            # else:
-            #     clips = [imgs_l[:,i:i+self.frames//self.gamma_tau,...] for i in range(0, step*self.crops, step)]
-            #     clips = torch.stack(clips, 0)
-            # TODO: what to do with validation??
-            clips_a = None
-            clips_b = None
+                clips_a = torch.stack(clips_a, 0)
+                clips_b = torch.stack(clips_b, 0)
+
+            else:
+                clips_a = img_list_a
+                clips_b = img_list_b
+
+            return clips_a, clips_b, label
+
+        # When training without contrastive loss
         else:
-            clips_a = img_list_a
-            clips_b = img_list_b
+            imgs_l = [self.spatial_transform(Image.fromarray(one_img)) for one_img in imgs]
+            imgs_l = torch.stack(imgs_l, 0).permute(1, 0, 2, 3)
 
-        return clips_a, clips_b, label
+            if self.split == 'validation' and self.task == 'class':  # self.crops > 1:
+                step = int((imgs_l.shape[1] - 1 - self.frames // self.gamma_tau) // (self.crops - 1))
+
+                if step == 0:
+                    clips = [imgs_l[:, :self.frames // self.gamma_tau, ...] for i in range(self.crops)]
+                    clips = torch.stack(clips, 0)
+                else:
+                    clips = [imgs_l[:, i:i + self.frames // self.gamma_tau, ...] for i in range(0, step * self.crops, step)]
+                    clips = torch.stack(clips, 0)
+            else:
+                clips = imgs_l
+
+            return clips, label
+
 
     def __len__(self):
         return len(self.data)

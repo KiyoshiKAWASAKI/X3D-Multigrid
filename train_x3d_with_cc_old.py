@@ -15,7 +15,7 @@ import mlp_network
 
 from utils import contrastive_loss
 from utils.apmeter import APMeter
-from data.ucf101 import customized_dataset
+from data.ucf101 import customized_dataset, custom_collate_fn
 from utils.transform import Transforms
 from transforms.spatial_transforms import Compose, Normalize, \
     RandomHorizontalFlip, MultiScaleRandomCropMultigrid, ToTensor, \
@@ -23,7 +23,7 @@ from transforms.spatial_transforms import Compose, Normalize, \
 
 warnings.filterwarnings("ignore")
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='0', type=str)
+parser.add_argument('-gpu', default='2', type=str)
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 
@@ -35,8 +35,9 @@ os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 BS = 8
 s=0.5
 BS_UPSCALE = 2
-INIT_LR = 0.02 * BS_UPSCALE
-GPUS = 2
+# INIT_LR = 0.002 * BS_UPSCALE
+INIT_LR = 0.02
+GPUS = 1
 
 instance_temperature = 0.5
 cluster_temperature = 1.0
@@ -52,13 +53,15 @@ TA2_ROOT = '/data/jin.huang/hmdb51/npy_json/0'
 TA2_ANNO = '/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json'
 
 # model_save_path = "/data/jin.huang/ucf101_models"
-model_save_path = "/data/jin.huang/hmdb51_models/0614_x3d_p0"
+model_save_path = "/data/jin.huang/models/contrastive_clustering/hmdb51/0630_debug"
 
 # TODO: these need to be changed
 # TA2_DATASET_SIZE = {'train':13446, 'val':1491}
 TA2_DATASET_SIZE = {'train':1906, 'val':212}
-TA2_MEAN = [0, 0, 0]
-TA2_STD = [1, 1, 1]
+# TA2_MEAN = [0, 0, 0]
+TA2_MEAN = [0.43216, 0.394666, 0.37645]
+# TA2_STD = [1, 1, 1]
+TA2_STD = [0.22803, 0.22145, 0.216989]
 
 
 ###############################################################
@@ -75,7 +78,7 @@ TA2_STD = [1, 1, 1]
 ###############################################################
 
 def run(init_lr=INIT_LR,
-        max_epochs=1,
+        max_epochs=100,
         root=TA2_ROOT,
         anno=TA2_ANNO,
         batch_size=BS*BS_UPSCALE):
@@ -92,7 +95,7 @@ def run(init_lr=INIT_LR,
     num_steps_per_update = 1 # ACCUMULATE GRADIENT IF NEEDED
     cur_iterations = steps * num_steps_per_update
     iterations_per_epoch = TA2_DATASET_SIZE['train']//batch_size
-    val_iterations_per_epoch = TA2_DATASET_SIZE['val']//(batch_size//2)
+    val_iterations_per_epoch = TA2_DATASET_SIZE['val']//(batch_size)
     max_steps = iterations_per_epoch * max_epochs
 
     # img_shape = [3, 16, 224, 224]
@@ -111,6 +114,8 @@ def run(init_lr=INIT_LR,
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
 
+    # val_spatial_transforms = train_spatial_transforms
+
     dataset = customized_dataset(split_file=anno,
                                  split='training',
                                  root=root,
@@ -118,7 +123,8 @@ def run(init_lr=INIT_LR,
                                  spatial_transform=train_spatial_transforms,
                                  frames=80,
                                  gamma_tau=gamma_tau,
-                                 crops=1)
+                                 crops=1,
+                                 use_contrastive_loss=True)
 
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
@@ -134,9 +140,11 @@ def run(init_lr=INIT_LR,
                                      spatial_transform=val_spatial_transforms,
                                      frames=80,
                                      gamma_tau=gamma_tau,
-                                     crops=10)
+                                     crops=10,
+                                     use_contrastive_loss=True)
+
     val_dataloader = torch.utils.data.DataLoader(val_dataset,
-                                                 batch_size=batch_size//2,
+                                                 batch_size=batch_size,
                                                  shuffle=False,
                                                  num_workers=12,
                                                  pin_memory=True)
@@ -154,7 +162,7 @@ def run(init_lr=INIT_LR,
 
     # TODO: Create MLP model
     mlp_model = mlp_network.mlp_network(feature_dim=26,
-                                        class_num=26)
+                                        class_num=26).cuda()
 
     # TODO: change here for different number of class in our dataset
     # x3d.replace_logits(88)
@@ -165,13 +173,12 @@ def run(init_lr=INIT_LR,
         load_ckpt = torch.load(model_save_path + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
         x3d.load_state_dict(load_ckpt['model_state_dict'])
 
-    x3d.cuda()
+    x3d = x3d.cuda()
     x3d = nn.DataParallel(x3d)
     print('model loaded')
 
     lr = init_lr
     print ('INIT LR: %f'%lr)
-
 
     optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
     lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
@@ -181,18 +188,24 @@ def run(init_lr=INIT_LR,
 
     criterion = nn.BCEWithLogitsLoss()
 
-    val_apm = APMeter()
+
     tr_apm_a = APMeter()
     tr_apm_b = APMeter()
 
+    val_apm_a = APMeter()
+    val_apm_b = APMeter()
+
     best_map = 0
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    torch.autograd.set_detect_anomaly(True)
+    print("Anomaly detection on.")
 
     while epochs < max_epochs:
         print ('Step {} Epoch {}'.format(steps, epochs))
         print ('-' * 10)
         # Each epoch has a training and validation phase
         for phase in ['train']+['val']:
+        # for phase in ['val']:
             bar_st = iterations_per_epoch if phase == 'train' else val_iterations_per_epoch
             bar = pkbar.Pbar(name='update: ', target=bar_st)
 
@@ -205,169 +218,192 @@ def run(init_lr=INIT_LR,
                 _ = x3d.module.aggregate_sub_bn_stats()
                 torch.autograd.set_grad_enabled(False)
 
-            tot_loss = 0.0
-            tot_cls_loss = 0.0
-            total_instance_loss = 0.0
+            total_loss = 0.0
+            # tot_cls_loss = 0.0
+            # total_instance_loss = 0.0
             num_iter = 0
             optimizer.zero_grad()
 
             # Iterate over data.
-            print(phase)
+            # print(phase)
+            # print(len(dataloaders["train"]))
+            # print(len(dataloaders["val"]))
+
             for i,data in enumerate(dataloaders[phase]):
                 num_iter += 1
                 bar.update(i)
+
                 if phase == 'train':
-                    # TODO: Get 2 augmented input here
+                    # Get 2 augmented input here
                     inputs_a, inputs_b, labels = data
 
-                    inputs_a = inputs_a.to(device)  # B 3 T W H
-                    inputs_b = inputs_b.to(device)
-                    labels = labels.to(device)  # B C
+                    inputs_a = inputs_a.cuda() # B 3 T W H
+                    inputs_b = inputs_b.cuda()
+                    labels = labels.cuda()
 
-                    # TODO: Two augmented images sent into a same X3D
-                    #  and gets two feature maps ha and hb
+                    # Two augmented images sent into a same X3D and gets two feature maps ha and hb
+                    # logit shape: [16, 26] ([batch_size, nb_classes])
+                    # probs shape: [16, 26] ([batch_size, nb_classes])
                     logits_a, _, _ = x3d(inputs_a)
                     logits_a = logits_a.squeeze(2)
-                    # probs = F.sigmoid(logits_a)
 
                     logits_b, _, _ = x3d(inputs_b)
                     logits_b = logits_b.squeeze(2)
-                    # probs_b = F.sigmoid(logits_b)
 
-                    # print(logits_a.shape)
-                    # print(probs.shape)
-
-                    # logit shape: [16, 26] ([batch_size, nb_classes])
-                    # probs shape: [16, 26] ([batch_size, nb_classes])
-
-                    # TODO: Send ha and hb into 2 MLP respectively
-                    # TODO: MLP1: does not have SoftMax, produces feature maps za and zb
-                    # TODO: MLP2: has a SoftMax, produces soft labels ya and yb
-                    z_a, z_b, y_a, y_b = mlp_model(logits_a, logits_b)
+                    # Send ha and hb into 2 MLP respectively
+                    # MLP1: does not have SoftMax, produces feature maps za and zb
+                    # MLP2: has a SoftMax, produces soft labels ya and yb
                     # shape of z_a, z_b, y_a, y_b: [batch_size, nb_classes]
+                    z_a, z_b, y_a, y_b = mlp_model(logits_a, logits_b)
 
-
-                    # loss_device = torch.device("cuda")
-                    # loss_device = torch.cuda.set_device(1)
-
-                    # TODO: Unsupervised loss - maximize similarity between za and zb
+                    # Unsupervised loss - maximize similarity between za and zb
                     criterion_cluster = contrastive_loss.ClusterLoss(26,
                                                                      cluster_temperature,
-                                                                     device).to(device)
+                                                                     device=None).cuda()
                     cluster_loss = criterion_cluster(z_a, z_b)
 
-                    # # TODO: Normal supervised learning for ya and yb
-                    # # TODO(Q): is it necessary to maximize similarity for ya and yb too?
-                    criterion_instance = contrastive_loss.InstanceLoss(batch_size,
-                                                                       instance_temperature,
-                                                                       device).to(device)
-                    instance_loss = criterion_instance(y_a, y_b, labels)
-
-                    # ya and yb are logits (modified)
-                    # instance_loss_a = criterion(y_a.to(loss_device), labels)
-                    # instance_loss_b = criterion(y_b.to(loss_device), labels)
-
-                    # z_a = z_a.to(device)
-                    # z_b.to(device)
-                    # y_a.to(device)
-                    # y_b.to(device)
-
+                    # Normal supervised learning for ya and yb
                     instance_loss_a = criterion(y_a, labels)
                     instance_loss_b = criterion(y_b, labels)
 
-                    total_instance_loss += instance_loss_a.item()
-                    total_instance_loss += instance_loss_b.item()
+                    # TODO: Get training predictions here
+                    probs_a = F.sigmoid(y_a)
+                    probs_a = torch.max(probs_a, dim=1)[0]
 
-                    loss = cluster_loss + instance_loss_a + instance_loss_b
+                    probs_b = F.sigmoid(y_b)
+                    probs_b = torch.max(probs_b, dim=1)[0]
 
-                    probs_a = y_a
-                    probs_b = y_b
-
+                    # TODO: Get mAP
                     tr_apm_a.add(probs_a.detach().cpu().numpy(), labels.cpu().numpy())
                     tr_apm_b.add(probs_b.detach().cpu().numpy(), labels.cpu().numpy())
 
+                    # Calculate total loss
+                    loss =  instance_loss_a + instance_loss_b - cluster_loss
                     loss.backward()
 
-                # TODO: fix the validation phase later
+                # validation process here
                 else:
-                    inputs, labels = data
-                    b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
-                    inputs = inputs.view(b*n,c,t,h,w)
+                    # Get 2 augmented input here
+                    inputs_a, inputs_b, labels = data
 
-                    inputs = inputs.cuda() # B 3 T W H
-                    labels = labels.cuda() # B C
+                    inputs_a = inputs_a.cuda()  # B 3 T W H
+                    inputs_b = inputs_b.cuda()
+                    labels = labels.cuda()
 
-                    with torch.no_grad():
-                        logits, _, _ = x3d(inputs)
-                    logits = logits.squeeze(2) # B C
-                    logits = logits.view(b,n,logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
-                    probs = F.sigmoid(logits)
-                    probs = torch.max(probs, dim=1)[0]
-                    logits = torch.max(logits, dim=1)[0]
+                    # TODO: check and fix input shape
+                    # print(len(inputs_a.shape))
+                    # print("\n")
+                    # print("@" * 20)
+                    # print(i)
+                    # print("@" * 20)
 
-                # cls_loss = criterion(logits, labels)
-                # tot_cls_loss += cls_loss.item()
-                #
-                # loss = cls_loss / num_steps_per_update
-                # tot_loss += loss.item()
+                    if len(inputs_a.shape) != 5:
+                        inputs_a = torch.squeeze(inputs_a)
+                        # print(inputs_a.shape)
+                    if len(inputs_b.shape) != 5:
+                        inputs_b = torch.squeeze(inputs_b)
+                        # print(inputs_b.shape)
+                    #
+                    # print("\n")
+                    # print("@" * 20)
+                    # print(inputs_a.shape)
+                    # print(inputs_b.shape)
+                    # print("@" * 20)
 
-                if phase == 'train':
-                    # tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
-                    # tr_apm_a.add(probs_a.detach().cpu().numpy(), labels.cpu().numpy())
-                    # tr_apm_b.add(probs_b.detach().cpu().numpy(), labels.cpu().numpy())
-                    # loss.backward()
-                    pass
-                else:
-                    val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+                    # Two augmented images sent into a same X3D and gets two feature maps
+                    logits_a, _, _ = x3d(inputs_a)
+                    logits_a = logits_a.squeeze(2)
 
+                    logits_b, _, _ = x3d(inputs_b)
+                    logits_b = logits_b.squeeze(2)
 
-                if num_iter == num_steps_per_update and phase == 'train':
-                    #lr_warmup(lr, steps-st_steps, warmup_steps, optimizer)
-                    steps += 1
-                    num_iter = 0
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    s_times = iterations_per_epoch//2
-                    if (steps-load_steps) % s_times == 0:
-                        tr_map_a = tr_apm_a.value().mean()
-                        tr_map_b = tr_apm_a.value().mean()
+                    # Send ha and hb into 2 MLP respectively
+                    z_a, z_b, y_a, y_b = mlp_model(logits_a, logits_b)
 
-                        tr_map_a.reset()
-                        tr_map_b.reset()
+                    # Unsupervised loss - maximize similarity between za and zb
+                    criterion_cluster = contrastive_loss.ClusterLoss(26,
+                                                                     cluster_temperature,
+                                                                     device=None).cuda()
+                    cluster_loss = criterion_cluster(z_a, z_b)
 
-                        print('Epoch (training):{} '
-                              'Cls Loss: {:.4f} '
-                              'mAP branch a: {:.4f} '
-                              'mAP branch a: {:.4f} '.format(epochs,
-                                                      loss,
-                                                      tr_map_a,
-                                                      tr_map_b))
+                    # Normal supervised learning for ya and yb
+                    instance_loss_a = criterion(y_a, labels)
+                    instance_loss_b = criterion(y_b, labels)
 
-                        # print (' Epoch:{} {} steps: {} Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
-                        #     steps, tot_cls_loss/(s_times*num_steps_per_update), tot_loss/s_times, tr_map))#, tot_acc/(s_times*num_steps_per_update)))
-                        # tot_loss = tot_cls_loss = 0.
-                    '''if steps % (1000) == 0:
-                        ckpt = {'model_state_dict': x3d.module.state_dict(),
-                                'optimizer_state_dict': optimizer.state_dict(),
-                                'scheduler_state_dict': lr_sched.state_dict()}
-                        torch.save(ckpt, save_model+str(steps).zfill(6)+'.pt')'''
+                    loss = instance_loss_a + instance_loss_b - cluster_loss
+
+                    # Probabilities
+                    probs_a = F.sigmoid(y_a)
+                    probs_a = torch.max(probs_a, dim=1)[0]
+
+                    probs_b = F.sigmoid(y_b)
+                    probs_b = torch.max(probs_b, dim=1)[0]
+
+                    # mAP
+                    val_apm_a.add(probs_a.detach().cpu().numpy(), labels.cpu().numpy())
+                    val_apm_b.add(probs_b.detach().cpu().numpy(), labels.cpu().numpy())
+
+                total_loss += loss.item()
+
+            # if (num_iter == num_steps_per_update) and (phase == "train"):
+            if phase == "train":
+                steps += 1
+                num_iter = 0
+                optimizer.step()
+                optimizer.zero_grad()
+                s_times = iterations_per_epoch // 2
+
+                if (steps - load_steps) % s_times == 0:
+                    tr_map_a = tr_apm_a.value().mean()
+                    tr_map_b = tr_apm_a.value().mean()
+
+                    tr_map_a.reset()
+                    tr_map_b.reset()
+
+                    print('Epoch (training):{} '
+                          'Cls Loss: {:.4f} '
+                          'mAP branch a: {:.4f} '
+                          'mAP branch a: {:.4f} '.format(epochs,
+                                                         total_loss,
+                                                         tr_map_a,
+                                                         tr_map_b))
 
             if phase == 'val':
-                pass
-                # val_map = val_apm.value().mean()
-                # lr_sched.step(tot_loss)
-                # val_apm.reset()
-                # print (' Epoch:{} {} Loc Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
-                #     tot_cls_loss/num_iter, (tot_loss*num_steps_per_update)/num_iter, val_map))
-                # tot_loss = tot_cls_loss = 0.
-                # if val_map > best_map:
-                #     ckpt = {'model_state_dict': x3d.module.state_dict(),
-                #             'optimizer_state_dict': optimizer.state_dict(),
-                #             'scheduler_state_dict': lr_sched.state_dict()}
-                #     best_map = val_map
-                #     best_epoch = epochs
-                #     print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
-                #     torch.save(ckpt, save_model+'best.pt')
+                val_map_a = val_apm_a.value().mean()
+                val_map_b = val_apm_b.value().mean()
+
+                lr_sched.step(total_loss)
+
+                val_apm_a.reset()
+                val_apm_b.reset()
+
+                print (' Epoch (validation):{}  '
+                       ' Validation Loss: {:.4f} '
+                       ' mAP (branch A): {:.4f} '
+                       ' mAP (branch B): {:.4f}\n'.format(epochs,
+                                                          total_loss,
+                                                          val_map_a,
+                                                          val_map_b))
+
+                total_loss = 0.0
+
+                if (val_map_a > best_map) and (val_map_b > best_map):
+                    ckpt = {'model_state_dict': x3d.module.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'scheduler_state_dict': lr_sched.state_dict()}
+
+                    if val_map_a > val_map_b:
+                        best_map = val_map_a
+                    else:
+                        best_map = val_map_b
+
+                    best_epoch = epochs
+
+                    print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
+                    torch.save(ckpt, save_model+'best.pt')
+
+
+
 
 def lr_warmup(init_lr, cur_steps, warmup_steps, opt):
     start_after = 1
@@ -375,6 +411,8 @@ def lr_warmup(init_lr, cur_steps, warmup_steps, opt):
         lr_scale = min(1., float(cur_steps + 1) / warmup_steps)
         for pg in opt.param_groups:
             pg['lr'] = lr_scale * init_lr
+
+
 
 
 def print_stats(long_ind, batch_size, stats, gamma_tau, bn_splits, lr):

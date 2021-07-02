@@ -54,6 +54,9 @@ class mlp_network(nn.Module):
         c_i = self.cluster_projector(x_i)
         c_j = self.cluster_projector(x_j)
 
+        # print(z_i)
+        # print(z_j)
+
         return z_i, z_j, c_i, c_j
 
     def forward_cluster(self, x):

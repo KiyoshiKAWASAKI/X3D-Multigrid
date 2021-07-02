@@ -1,30 +1,34 @@
+# Build training pipeline for all beseline methods
+# Date: 06/28/2020
+# Author: Jin Huang. Based on Dawei and X3D official code
+
 import os
 import argparse
 
 import torch
+import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
-
-import torchvision
-from torchvision import datasets, transforms
-from torchsummary import summary
-
-import numpy as np
-from barbar import Bar
 import pkbar
-from utils.apmeter import APMeter
-
+import pdb
+import numpy as np
 import x3d as resnet_x3d
 
-from data.ucf101 import customized_dataset
+from torch.optim import lr_scheduler
+from torch.autograd import Variable
+from torchsummary import summary
+from torchvision import datasets, transforms
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, MultiScaleRandomCropMultigrid, ToTensor, CenterCrop, CenterCropScaled
+from barbar import Bar
+from utils.apmeter import APMeter
+from data.ucf101 import customized_dataset
+from transforms.spatial_transforms import Compose, Normalize, \
+    RandomHorizontalFlip, MultiScaleRandomCrop, \
+    MultiScaleRandomCropMultigrid, ToTensor, \
+    CenterCrop, CenterCropScaled
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
-import pdb
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -35,28 +39,153 @@ parser.add_argument('-gpu', default='0', type=str)
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 
+# TODO: Build baseline pipeline for both HMDB51 and UCF101
 
-BS = 16
-BS_UPSCALE = 2
-INIT_LR = 0.02 * BS_UPSCALE
-GPUS = 2
+####################################################
+# Setup paths and parameters
+####################################################
+dataset = "hmdb_ta2" # choose among ["ucf101", "ucf101_ta2", "hmdb", "hmdb_ta2"]
+use_pretrain = True # Pretrain model is from Kinetics 400
+
+if use_pretrain:
+    pretrain_model_path = "models/x3d_multigrid_kinetics_fb_pretrained.pt"
+
+# UCF101 official partition
+if dataset == "ucf101":
+    nb_classes = 101
+
+    npy_root_dir = ""
+    anno_json_path = ""
+    model_save_dir = ""
+
+
+# UCF101 SAIL-ON partition
+elif dataset == "ucf101_ta2":
+    nb_classes = 88
+
+    npy_root_dir = ""
+    anno_json_path = "/data/jin.huang/ucf101_npy_json/ucf101.json"
+    model_save_dir = ""
+
+
+# HMDB51 official partition
+elif dataset == "hmdb51":
+    nb_classes = 51
+
+    npy_root_dir = ""
+    anno_json_path = ""
+    model_save_dir = ""
+
+
+# HMDB51 SAIL-ON partition
+elif dataset == "hmdb_ta2":
+    nb_classes = 26
+
+    npy_root_dir = "/data/jin.huang/hmdb51/npy_json/0"
+    anno_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json"
+    model_save_dir = "/data/jin.huang/hmdb51_models/0614_x3d_p0"
+
+    data_mean = [0, 0, 0]
+    data_std = [1, 1, 1]
+
+####################################################
+# Usually, no need to change these
+####################################################
+nb_gpu = 1
+batch = 16
+nb_epoch = 100
+batch_upscale = 2
+nb_workers = 12
+init_lr = 0.02 * batch_upscale
 
 X3D_VERSION = 'M'
+use_long_cycle = False
+cont_training = False
 
-# This is the root dir to the npy file
-TA2_ROOT = '/data/jin.huang/ucf101_npy_json/'
-# This is the path to json file
-TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ucf101.json'
+if use_long_cycle:
+    pass
 
-model_save_path = "/data/jin.huang/ucf101_models"
+if cont_training:
+    previous_model_path = None
 
-# TODO: these need to be changed
+
+frames=80 # DOUBLED INSIDE DATASET, AS LONGER CLIPS
+crop_size = {'S':160, 'M':224, 'XL':312}[X3D_VERSION]
+gamma_tau = {'S':6, 'M':5, 'XL':5}[X3D_VERSION]
+
+if not use_long_cycle:
+    resize_size = {'S': [180., 225.],
+                   'M': [256., 256.],
+                   'XL': [360., 450.]}[X3D_VERSION]
+else:
+    resize_size = {'S':[180.,225.],
+                   'M':[256.,320.],
+                   'XL':[360.,450.]}[X3D_VERSION]
+
 TA2_DATASET_SIZE = {'train':13446, 'val':1491}
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
-# warmup_steps=0
-def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_size=BS*BS_UPSCALE):
+
+####################################################
+# Usually, no need to change these
+####################################################
+def lr_warmup(init_lr,
+              cur_steps,
+              warmup_steps,
+              opt):
+    """
+
+    """
+    start_after = 1
+    if cur_steps < warmup_steps and cur_steps > start_after:
+        lr_scale = min(1., float(cur_steps + 1) / warmup_steps)
+        for pg in opt.param_groups:
+            pg['lr'] = lr_scale * init_lr
+
+
+def print_stats(long_ind,
+                batch_size,
+                stats,
+                gamma_tau,
+                bn_splits,
+                lr):
+    """
+
+    """
+    bs = batch_size * LONG_CYCLE[long_ind]
+    if long_ind in [0,1]:
+        bs = [bs*j for j in [2,1]]
+        print(' ***** LR {} '
+              'Frames {}/{} '
+              'BS ({},{}) '
+              'W/H ({},{}) '
+              'BN_splits {} '
+              'long_ind {} *****'.format(lr,
+                                         stats[0][0], gamma_tau,
+                                         bs[0], bs[1],
+                                         stats[2][0], stats[3][0],
+                                         bn_splits,
+                                         long_ind))
+    else:
+        bs = [bs*j for j in [4,2,1]]
+        print(' ***** LR {} '
+              'Frames {}/{} '
+              'BS ({},{},{}) '
+              'W/H ({},{},{}) '
+              'BN_splits {} '
+              'long_ind {} *****'.format(lr,
+                                         stats[0][0], gamma_tau,
+                                         bs[0], bs[1], bs[2],
+                                         stats[1][0], stats[2][0], stats[3][0],
+                                         bn_splits,
+                                         long_ind))
+
+
+####################################################
+# Training pipeline
+####################################################
+def run(init_lr=init_lr, max_epochs=100, root=npy_root_dir, anno=anno_json_path, batch_size=batch*batch_upscale):
 
     frames=80 # DOUBLED INSIDE DATASET, AS LONGER CLIPS
     crop_size = {'S':160, 'M':224, 'XL':312}[X3D_VERSION]
@@ -90,9 +219,14 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                                  spatial_transform=train_spatial_transforms,
                                  frames=80,
                                  gamma_tau=gamma_tau,
-                                 crops=1)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                                            num_workers=12, pin_memory=True)
+                                 crops=1,
+                                 use_contrastive_loss=False)
+
+    dataloader = torch.utils.data.DataLoader(dataset,
+                                             batch_size=batch_size,
+                                             shuffle=True,
+                                             num_workers=12,
+                                             pin_memory=True)
 
     val_dataset = customized_dataset(split_file=anno,
                                      split='validation',
@@ -101,9 +235,14 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                                      spatial_transform=val_spatial_transforms,
                                      frames=80,
                                      gamma_tau=gamma_tau,
-                                     crops=10)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size//2, shuffle=False,
-                                                num_workers=12, pin_memory=True)
+                                     crops=10,
+                                     use_contrastive_loss=False)
+
+    val_dataloader = torch.utils.data.DataLoader(val_dataset,
+                                                 batch_size=batch_size//2,
+                                                 shuffle=False,
+                                                 num_workers=12,
+                                                 pin_memory=True)
 
     dataloaders = {'train': dataloader, 'val': val_dataloader}
     datasets = {'train': dataset, 'val': val_dataset}
@@ -115,13 +254,13 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION, n_classes=400, n_input_channels=3, dropout=0.5, base_bn_splits=1)
     load_ckpt = torch.load('models/x3d_multigrid_kinetics_fb_pretrained.pt')
     x3d.load_state_dict(load_ckpt['model_state_dict'])
-    save_model = model_save_path + '/x3d_ta2_rgb_sgd_'
+    save_model = model_save_dir + '/x3d_ta2_rgb_sgd_'
     # TODO: what is replace_logits
     # x3d.replace_logits(88)
     x3d.replace_logits(101)
 
     if steps>0:
-        load_ckpt = torch.load(model_save_path + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
+        load_ckpt = torch.load(model_save_dir + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
         x3d.load_state_dict(load_ckpt['model_state_dict'])
 
     x3d.cuda()
@@ -255,23 +394,8 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                     print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
                     torch.save(ckpt, save_model+'best.pt')
 
-def lr_warmup(init_lr, cur_steps, warmup_steps, opt):
-    start_after = 1
-    if cur_steps < warmup_steps and cur_steps > start_after:
-        lr_scale = min(1., float(cur_steps + 1) / warmup_steps)
-        for pg in opt.param_groups:
-            pg['lr'] = lr_scale * init_lr
-
-
-def print_stats(long_ind, batch_size, stats, gamma_tau, bn_splits, lr):
-    bs = batch_size * LONG_CYCLE[long_ind]
-    if long_ind in [0,1]:
-        bs = [bs*j for j in [2,1]]
-        print(' ***** LR {} Frames {}/{} BS ({},{}) W/H ({},{}) BN_splits {} long_ind {} *****'.format(lr, stats[0][0], gamma_tau, bs[0], bs[1], stats[2][0], stats[3][0], bn_splits, long_ind))
-    else:
-        bs = [bs*j for j in [4,2,1]]
-        print(' ***** LR {} Frames {}/{} BS ({},{},{}) W/H ({},{},{}) BN_splits {} long_ind {} *****'.format(lr, stats[0][0], gamma_tau, bs[0], bs[1], bs[2], stats[1][0], stats[2][0], stats[3][0], bn_splits, long_ind))
 
 
 if __name__ == '__main__':
     run()
+
