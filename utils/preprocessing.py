@@ -125,7 +125,7 @@ def process_hmdb_txt2csv(src_txt_path, save_csv_path):
 
 
 
-def convert_ucf_to_dict(dataset_path, csv_path):
+def convert_ucf_to_dict(dataset_path, csv_path, gen_test):
     """
     Generate the keys and labels for training and validation
     """
@@ -140,18 +140,41 @@ def convert_ucf_to_dict(dataset_path, csv_path):
         basename = slash_rows[1]
         tmp.append(basename+"@"+class_name)
     unique_list = sorted(set(tmp),key=tmp.index)
-    
-    for i in trange(len(unique_list)):
-        base_name, class_name = unique_list[i].split("@")
-        video_path = os.path.join(dataset_path, base_name)
-        if i%10 != 0: # 90% training
-            train_keys.append(video_path)
-            train_key_labels.append(class_name)
-        else: # 10% validation
-            val_keys.append(video_path)
-            val_key_labels.append(class_name)        
 
-    return train_keys, val_keys, train_key_labels, val_key_labels
+    # print(unique_list) # Correct
+
+    # for i in range(len(unique_list)):
+    #     base_name, class_name = unique_list[i].split("@")
+    #     video_path = os.path.join(dataset_path, base_name)
+    #
+    #     print(video_path)
+
+    if gen_test:
+        for i in range(len(unique_list)):
+            try:
+                base_name, class_name = unique_list[i].split("@")
+                video_path = os.path.join(dataset_path, base_name)
+
+                train_keys.append(video_path)
+                train_key_labels.append(class_name)
+            except:
+                print(i, unique_list[i].split("@"))
+
+        return train_keys, train_key_labels
+
+    else:
+        for i in range(len(unique_list)):
+            base_name, class_name = unique_list[i].split("@")
+            video_path = os.path.join(dataset_path, base_name)
+
+            if i%10 != 0: # 90% training
+                train_keys.append(video_path)
+                train_key_labels.append(class_name)
+            else: # 10% validation
+                val_keys.append(video_path)
+                val_key_labels.append(class_name)
+
+        return train_keys, val_keys, train_key_labels, val_key_labels
 
 
 
@@ -176,8 +199,8 @@ def get_hmdb_labels(label_csv_path):
 
     data[['label', 'path']] = data['video'].str.split('/', expand=True)
     unique_keys = data.label.unique()
-    print(len(unique_keys))
 
+    # print(unique_keys)
 
     return unique_keys.tolist()
 
@@ -230,66 +253,120 @@ def convert_TA2_to_json(train_csv_path,
                         train_mode,
                         video_dir_path,
                         dst_json_path,
+                        gen_test,
                         process_hmdb51=False):
     dst_data = {}
     dst_data['database'] = {}
     train_database, val_database = {}, {}
 
     for k in range(len(train_csv_path)):
-        if train_mode[0] == 'ucf101':
-            labels, label_map = load_ucf_labels(train_csv_path[k])
-            train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[0],
-                                                                                         train_csv_path[k])
-            dst_data['labels'] = labels
+        if gen_test:
+            if train_mode[0] == 'ucf101':
+                labels, label_map = load_ucf_labels(train_csv_path[k])
 
-        elif train_mode[0] == "hmdb51":
-            labels =  get_hmdb_labels(train_csv_path[k])
-            train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[0],
-                                                                                         train_csv_path[k])
-            dst_data['labels'] = labels
+
+                train_keys, train_key_labels = convert_ucf_to_dict(video_dir_path[0],
+                                                                 train_csv_path[k],
+                                                                 gen_test=True)
+
+                dst_data['labels'] = labels
+
+            elif train_mode[0] == "hmdb51":
+                labels = get_hmdb_labels(train_csv_path[k])
+                train_keys, train_key_labels= convert_ucf_to_dict(video_dir_path[0],
+                                                                 train_csv_path[k],
+                                                                 gen_test=True)
+                dst_data['labels'] = labels
+
+            else:
+                pass
+                # train_keys_, val_keys_, train_key_labels_, val_key_labels_ = convert_kinetics_to_dict(video_dir_path[k],
+                #                                                                                       train_csv_path[k],
+                #                                                                                       label_map)
+                # train_keys = train_keys + train_keys_
+                # val_keys = val_keys + val_keys_
+                # train_key_labels = train_key_labels + train_key_labels_
+                # val_key_labels = val_key_labels + val_key_labels_
 
         else:
-            train_keys_, val_keys_, train_key_labels_, val_key_labels_ = convert_kinetics_to_dict(video_dir_path[k],
-                                                                                                  train_csv_path[k],
-                                                                                                  label_map)
-            train_keys = train_keys + train_keys_
-            val_keys = val_keys + val_keys_
-            train_key_labels = train_key_labels + train_key_labels_
-            val_key_labels = val_key_labels + val_key_labels_
+            if train_mode[0] == 'ucf101':
+                labels, label_map = load_ucf_labels(train_csv_path[k])
+                train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[0],
+                                                                                             train_csv_path[k],
+                                                                                             gen_test=False)
+                dst_data['labels'] = labels
+
+            elif train_mode[0] == "hmdb51":
+                labels =  get_hmdb_labels(train_csv_path[k])
+                train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[0],
+                                                                                             train_csv_path[k],
+                                                                                             gen_test=False)
+                dst_data['labels'] = labels
+
+            else:
+                train_keys_, val_keys_, train_key_labels_, val_key_labels_ = convert_kinetics_to_dict(video_dir_path[k],
+                                                                                                      train_csv_path[k],
+                                                                                                      label_map)
+                train_keys = train_keys + train_keys_
+                val_keys = val_keys + val_keys_
+                train_key_labels = train_key_labels + train_key_labels_
+                val_key_labels = val_key_labels + val_key_labels_
 
     # HMDB51 has subfolders for each class, so we need to process in a different way
     if process_hmdb51:
-        for i in range(len(train_keys)):
-            old_key = train_keys[i]
-            key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
-            train_database[key] = {}
-            train_database[key]['subset'] = 'training'
-            train_database[key]['annotations'] = {'label': train_key_labels[i]}
+        if gen_test:
+            for i in range(len(train_keys)):
+                old_key = train_keys[i]
+                key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'test'
+                train_database[key]['annotations'] = {'label': train_key_labels[i]}
 
-        for i in range(len(val_keys)):
-            old_key = val_keys[i]
-            key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
-            val_database[key] = {}
-            val_database[key]['subset'] = 'validation'
-            val_database[key]['annotations'] = {'label': val_key_labels[i]}
+        else:
+            for i in range(len(train_keys)):
+                old_key = train_keys[i]
+                key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'training'
+                train_database[key]['annotations'] = {'label': train_key_labels[i]}
+
+            for i in range(len(val_keys)):
+                old_key = val_keys[i]
+                key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
+                val_database[key] = {}
+                val_database[key]['subset'] = 'validation'
+                val_database[key]['annotations'] = {'label': val_key_labels[i]}
 
     else:
-        for i in range(len(train_keys)):
-            key = train_keys[i]
-            train_database[key] = {}
-            train_database[key]['subset'] = 'training'
-            label = train_key_labels[i]
-            train_database[key]['annotations'] = {'label': label}
+        if gen_test:
+            for i in range(len(train_keys)):
+                key = train_keys[i]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'testing'
+                label = train_key_labels[i]
+                train_database[key]['annotations'] = {'label': label}
 
-        for i in range(len(val_keys)):
-            key = val_keys[i]
-            val_database[key] = {}
-            val_database[key]['subset'] = 'validation'
-            label = val_key_labels[i]
-            val_database[key]['annotations'] = {'label': label}
+        else:
+            for i in range(len(train_keys)):
+                key = train_keys[i]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'training'
+                label = train_key_labels[i]
+                train_database[key]['annotations'] = {'label': label}
 
-    dst_data['database'].update(train_database)
-    dst_data['database'].update(val_database)
+            for i in range(len(val_keys)):
+                key = val_keys[i]
+                val_database[key] = {}
+                val_database[key]['subset'] = 'validation'
+                label = val_key_labels[i]
+                val_database[key]['annotations'] = {'label': label}
+
+    if gen_test:
+        dst_data['database'].update(train_database)
+    else:
+        dst_data['database'].update(train_database)
+        dst_data['database'].update(val_database)
+
     cnt = 0
     
     for video_path, frame_range in dst_data['database'].items():
@@ -333,7 +410,8 @@ def get_hmdb51_data(data_dir):
 
 
 if __name__ == '__main__':
-    dataset_name = "hmdb"
+    # dataset_name = "hmdb"
+    dataset_name = "ucf101"
 
     if dataset_name == "ucf101":
         train_mode = ['ucf101']
@@ -351,21 +429,42 @@ if __name__ == '__main__':
         test_known_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/test_known_0.csv"
         test_unknown_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/test_unknown_0.csv"
 
-        process_ucf_txt2csv(src_txt_path=train_known_txt_path,
-                            save_csv_path=train_known_csv_path)
-        process_ucf_txt2csv(src_txt_path=test_known_txt_path,
-                            save_csv_path=test_known_csv_path)
-        process_ucf_txt2csv(src_txt_path=test_unknown_txt_path,
-                            save_csv_path=test_unknown_csv_path)
+        # process_ucf_txt2csv(src_txt_path=train_known_txt_path,
+        #                     save_csv_path=train_known_csv_path)
+        # process_ucf_txt2csv(src_txt_path=test_known_txt_path,
+        #                     save_csv_path=test_known_csv_path)
+        # process_ucf_txt2csv(src_txt_path=test_unknown_txt_path,
+        #                     save_csv_path=test_unknown_csv_path)
 
         # Generate training Json file
         train_csv_path = [train_known_csv_path]
         test_csv_path = []
 
-        convert_TA2_to_json(train_csv_path=train_csv_path,
+        # convert_TA2_to_json(train_csv_path=train_csv_path,
+        #                     train_mode=train_mode,
+        #                     video_dir_path=video_path,
+        #                     dst_json_path=dst_json_path,
+        #                     gen_test=False)
+
+        test_known_csv = [test_known_csv_path]
+        test_unknown_csv = [test_unknown_csv_path]
+
+        dst_test_known_json_path = dst_path + 'ta2_partition_0_test_known.json'
+        dst_test_unknown_json_path = dst_path + 'ta2_partition_0_test_unknown.json'
+
+        convert_TA2_to_json(train_csv_path=test_known_csv,
                             train_mode=train_mode,
                             video_dir_path=video_path,
-                            dst_json_path=dst_json_path)
+                            dst_json_path=dst_test_known_json_path,
+                            gen_test=True,
+                            process_hmdb51=False)
+
+        convert_TA2_to_json(train_csv_path=test_unknown_csv,
+                            train_mode=train_mode,
+                            video_dir_path=video_path,
+                            dst_json_path=dst_test_unknown_json_path,
+                            gen_test=True,
+                            process_hmdb51=False)
 
     elif dataset_name == "hmdb":
         hmdb51_rar = "/data/jin.huang/hmdb51/HMDB51"
@@ -396,10 +495,30 @@ if __name__ == '__main__':
 
         train_csv_path = [train_known_csv_path]
 
-        convert_TA2_to_json(train_csv_path=train_csv_path,
+        # convert_TA2_to_json(train_csv_path=train_csv_path,
+        #                     train_mode=train_mode,
+        #                     video_dir_path=video_path,
+        #                     dst_json_path=dst_json_path,
+        #                     process_hmdb51=True)
+
+        test_known_csv = [test_known_csv_path]
+        test_unknown_csv = [test_unknown_csv_path]
+
+        dst_test_known_json_path = dst_path + 'ta2_partition_0_test_known.json'
+        dst_test_unknown_json_path = dst_path + 'ta2_partition_0_test_unknown.json'
+
+        convert_TA2_to_json(train_csv_path=test_known_csv,
                             train_mode=train_mode,
                             video_dir_path=video_path,
-                            dst_json_path=dst_json_path,
+                            dst_json_path=dst_test_known_json_path,
+                            gen_test=True,
+                            process_hmdb51=True)
+
+        convert_TA2_to_json(train_csv_path=test_unknown_csv,
+                            train_mode=train_mode,
+                            video_dir_path=video_path,
+                            dst_json_path=dst_test_unknown_json_path,
+                            gen_test=True,
                             process_hmdb51=True)
 
 

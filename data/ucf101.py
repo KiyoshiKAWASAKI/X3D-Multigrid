@@ -153,6 +153,75 @@ def make_dataset(split_file, split, root, num_classes=26):
     return dataset
 
 
+class UCF101(data_utl.Dataset):
+
+    def __init__(self, split_file, split, root, num_classes=88, spatial_transform=None, task='class', frames=80, gamma_tau=5, crops=1):
+    # def __init__(self, split_file, split, root, num_classes=101, spatial_transform=None, task='class', frames=80, gamma_tau=5, crops=1):
+
+        self.data = make_dataset(split_file, split, root, num_classes)
+        self.split_file = split_file
+        self.root = root
+        self.frames = frames * 2
+        self.gamma_tau = gamma_tau * 2
+        self.loader = get_default_video_loader()
+        self.spatial_transform = spatial_transform
+        self.crops = crops
+        self.split = split
+        self.task = task
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: (image, target) where target is class_index of the target class.
+        """
+        if self.crops > 1:
+            self.split = 'validation'
+        vid, label, nf = self.data[index]
+        if self.split == 'validation':
+            frames = nf
+            start_f = 1
+        else:
+            frames = self.frames
+            start_f = random.randint(1,nf-(self.frames+1))
+        stride_f = self.gamma_tau
+        imgs = load_rgb_frames(self.root, vid, start_f, frames, stride_f, self.loader)
+        label = label[:, start_f-1:start_f-1+frames:1] #stride_f
+        label = torch.from_numpy(label)
+        if self.task == 'class':
+            label = torch.max(label, dim=1)[0] # C T --> C
+        if self.spatial_transform is not None:
+            # print(self.spatial_transform )
+            self.spatial_transform.randomize_parameters(224)
+            imgs_l = [self.spatial_transform(Image.fromarray(img)) for img in imgs]
+        imgs_l = torch.stack(imgs_l, 0).permute(1, 0, 2, 3) # T C H W --> C T H W
+
+        # print("@" * 20)
+        # print(imgs_l.shape)
+
+        if self.split == 'validation' and self.task == 'class': #self.crops > 1:
+            step = int((imgs_l.shape[1] - 1 - self.frames//self.gamma_tau)//(self.crops-1))
+            if step == 0:
+                clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
+                clips = torch.stack(clips, 0)
+                # print("clips when step == 0")
+                # print(clips.shape)
+            else:
+                clips = [imgs_l[:,i:i+self.frames//self.gamma_tau,...] for i in range(0, step*self.crops, step)]
+                clips = torch.stack(clips, 0)
+                # print("clips when step != 0")
+                # print(clips.shape)
+        else:
+            clips = imgs_l
+
+        # print("@" * 20)
+
+        return clips, label
+
+    def __len__(self):
+        return len(self.data)
+
+
 class customized_dataset(data_utl.Dataset):
 
     def __init__(self,

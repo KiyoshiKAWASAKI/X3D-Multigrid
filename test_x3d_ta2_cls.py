@@ -20,23 +20,51 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='0,1', type=str)
+parser.add_argument('-gpu', default='0', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 
+dataset_used = "ucf101"
+test_known = True
+
+# TODO: This is UCF101 data
+if dataset_used == "ucf101":
+    TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
+    TA2_DATASET_SIZE = {'train': 13446, 'val': 1491}
+    nb_classes = 88
+
+    if test_known == True:
+        TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known.json'
+    else:
+        TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known.json'
+
+else:
+    TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
+    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+    TA2_DATASET_SIZE = {'train': 13446, 'val': 1491}
+    nb_classes = 26
+
+    if test_known == True:
+        TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known.json"
+    else:
+        TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown.json"
+
+
+
+
+
+TA2_MEAN = [0, 0, 0]
+TA2_STD = [1, 1, 1]
 
 BS = 16
 BS_UPSCALE = 2
-GPUS = 2
+GPUS = 1
 
 X3D_VERSION = 'M'
 
-TA2_ROOT = '../datasets/TA2_splits'
-TA2_ANNO = '../datasets/TA2_splits/TA2_classification.json'
-TA2_DATASET_SIZE = {'train':13446, 'val':1491}
-TA2_MEAN = [0, 0, 0]
-TA2_STD = [1, 1, 1]
+all_unknown_logits = []
 
 # warmup_steps=0
 def run(root=TA2_ROOT, anno=TA2_ANNO, batch_size=BS*BS_UPSCALE):
@@ -51,12 +79,26 @@ def run(root=TA2_ROOT, anno=TA2_ANNO, batch_size=BS*BS_UPSCALE):
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
 
-    val_dataset = UCF101(anno, 'validation', root, val_spatial_transforms, frames=80, gamma_tau=gamma_tau, crops=10)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False,
-                                                num_workers=8, pin_memory=True)
+    # val_dataset = UCF101(anno, 'validation', root, val_spatial_transforms, frames=80, gamma_tau=gamma_tau, crops=10)
+    # val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False,
+    #                                             num_workers=8, pin_memory=True)
+
+    val_dataset = UCF101(split_file=anno,
+                         split='validation',
+                         root=root,
+                         num_classes=nb_classes,
+                         spatial_transform=val_spatial_transforms,
+                         frames=80,
+                         gamma_tau=gamma_tau,
+                         crops=10)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset,
+                                                 batch_size=batch_size // 2,
+                                                 shuffle=False,
+                                                 num_workers=4,
+                                                 pin_memory=True)
 
     x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION, n_classes=88, n_input_channels=3, dropout=0.5, base_bn_splits=1)
-    load_ckpt = torch.load('models/x3d_ta2_rgb_sgd_best.pt')
+    load_ckpt = torch.load(trained_model_path)
     x3d.load_state_dict(load_ckpt['model_state_dict'])
 
     x3d.cuda()
@@ -71,6 +113,9 @@ def run(root=TA2_ROOT, anno=TA2_ANNO, batch_size=BS*BS_UPSCALE):
     bar = pkbar.Pbar(name='evaluating: ', target=bar_st)
     x3d.train(False)  # Set model to evaluate mode
     _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS
+
+    # TODO: Add counts for unknown test
+    unknown
 
     # Iterate over data.
     for i,data in enumerate(val_dataloader):
@@ -91,6 +136,8 @@ def run(root=TA2_ROOT, anno=TA2_ANNO, batch_size=BS*BS_UPSCALE):
         #logits = torch.mean(logits, 1)
         probs = torch.max(probs, dim=1)[0]
         logits = torch.max(logits, dim=1)[0]
+
+        # TODO: Add
 
         val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 

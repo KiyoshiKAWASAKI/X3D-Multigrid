@@ -34,7 +34,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='0', type=str)
+parser.add_argument('-gpu', default='1', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
@@ -83,7 +83,9 @@ elif dataset == "hmdb_ta2":
 
     npy_root_dir = "/data/jin.huang/hmdb51/npy_json/0"
     anno_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json"
-    model_save_dir = "/data/jin.huang/hmdb51_models/0614_x3d_p0"
+    model_save_dir = "/data/jin.huang/models/x3d/thresholding/0702_hmdb"
+
+    TA2_DATASET_SIZE = {'train': 1906, 'val': 212}
 
     data_mean = [0, 0, 0]
     data_std = [1, 1, 1]
@@ -92,7 +94,7 @@ elif dataset == "hmdb_ta2":
 # Usually, no need to change these
 ####################################################
 nb_gpu = 1
-batch = 16
+batch = 8
 nb_epoch = 100
 batch_upscale = 2
 nb_workers = 12
@@ -122,7 +124,7 @@ else:
                    'M':[256.,320.],
                    'XL':[360.,450.]}[X3D_VERSION]
 
-TA2_DATASET_SIZE = {'train':13446, 'val':1491}
+# TA2_DATASET_SIZE = {'train':13446, 'val':1491}
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
@@ -251,13 +253,18 @@ def run(init_lr=init_lr, max_epochs=100, root=npy_root_dir, anno=anno_json_path,
     print('datasets created')
 
 
-    x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION, n_classes=400, n_input_channels=3, dropout=0.5, base_bn_splits=1)
+    x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION,
+                                    n_classes=400,
+                                    n_input_channels=3,
+                                    dropout=0.5,
+                                    base_bn_splits=1)
     load_ckpt = torch.load('models/x3d_multigrid_kinetics_fb_pretrained.pt')
     x3d.load_state_dict(load_ckpt['model_state_dict'])
     save_model = model_save_dir + '/x3d_ta2_rgb_sgd_'
     # TODO: what is replace_logits
     # x3d.replace_logits(88)
-    x3d.replace_logits(101)
+    # x3d.replace_logits(101)
+    x3d.replace_logits(nb_classes)
 
     if steps>0:
         load_ckpt = torch.load(model_save_dir + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
@@ -310,8 +317,8 @@ def run(init_lr=init_lr, max_epochs=100, root=npy_root_dir, anno=anno_json_path,
                 bar.update(i)
                 if phase == 'train':
                     inputs, labels = data
-                    print("Checking input and label size")
-                    print(inputs.shape)
+                    # print("Checking input and label size")
+                    # print(inputs.shape)
 
                 else:
                     inputs, labels = data
@@ -329,9 +336,9 @@ def run(init_lr=init_lr, max_epochs=100, root=npy_root_dir, anno=anno_json_path,
                     # print(logits.shape)
                     # print(probs.shape)
 
-                    print("@" * 30)
-                    print(logits)
-                    print("@" * 30)
+                    # print("@" * 30)
+                    # print(logits)
+                    # print("@" * 30)
 
                 else:
                     with torch.no_grad():

@@ -129,7 +129,7 @@ def run(init_lr=INIT_LR,
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
                                              shuffle=True,
-                                             num_workers=12,
+                                             num_workers=4,
                                              pin_memory=True)
 
 
@@ -146,7 +146,7 @@ def run(init_lr=INIT_LR,
     val_dataloader = torch.utils.data.DataLoader(val_dataset,
                                                  batch_size=batch_size,
                                                  shuffle=False,
-                                                 num_workers=12,
+                                                 num_workers=4,
                                                  pin_memory=True)
 
     dataloaders = {'train': dataloader, 'val': val_dataloader}

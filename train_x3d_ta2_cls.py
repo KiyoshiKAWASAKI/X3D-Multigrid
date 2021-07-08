@@ -19,9 +19,12 @@ from utils.apmeter import APMeter
 
 import x3d as resnet_x3d
 
-from data.ucf101 import customized_dataset
+from data.ucf101 import customized_dataset, UCF101
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, MultiScaleRandomCropMultigrid, ToTensor, CenterCrop, CenterCropScaled
+from transforms.spatial_transforms_old import Compose, Normalize, \
+    RandomHorizontalFlip, MultiScaleRandomCrop, \
+    MultiScaleRandomCropMultigrid, ToTensor, \
+    CenterCrop, CenterCropScaled
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
 import pdb
@@ -30,28 +33,34 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='0', type=str)
+parser.add_argument('-gpu', default='1', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 
 
-BS = 16
+BS = 4
 BS_UPSCALE = 2
 INIT_LR = 0.02 * BS_UPSCALE
-GPUS = 2
+GPUS = 1
 
 X3D_VERSION = 'M'
 
 # This is the root dir to the npy file
-TA2_ROOT = '/data/jin.huang/ucf101_npy_json/'
-# This is the path to json file
-TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ucf101.json'
+# TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+TA2_ROOT = '/data/jin.huang/hmdb51/npy_json/0'
 
-model_save_path = "/data/jin.huang/ucf101_models"
+# This is the path to json file
+# TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json'
+TA2_ANNO = '/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json'
+
+# model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf"
+model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb"
 
 # TODO: these need to be changed
-TA2_DATASET_SIZE = {'train':13446, 'val':1491}
+# TA2_DATASET_SIZE = {'train':13446, 'val':1491}
+# TA2_DATASET_SIZE = {'train':4235, 'val':471} # UCF101 TA2 split
+TA2_DATASET_SIZE = {'train':1906, 'val':212} # HMDB51 TA2 split
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
@@ -83,27 +92,33 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
 
-    dataset = customized_dataset(split_file=anno,
-                                 split='training',
-                                 root=root,
-                                 num_classes=26,
-                                 spatial_transform=train_spatial_transforms,
-                                 frames=80,
-                                 gamma_tau=gamma_tau,
-                                 crops=1)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                                            num_workers=12, pin_memory=True)
+    dataset = UCF101(split_file=anno,
+                     split='training',
+                     root=root,
+                     num_classes=26,
+                     spatial_transform=train_spatial_transforms,
+                     frames=80,
+                     gamma_tau=gamma_tau,
+                     crops=1)
+    dataloader = torch.utils.data.DataLoader(dataset,
+                                             batch_size=batch_size,
+                                             shuffle=True,
+                                             num_workers=4,
+                                             pin_memory=True)
 
-    val_dataset = customized_dataset(split_file=anno,
-                                     split='validation',
-                                     root=root,
-                                     num_classes=26,
-                                     spatial_transform=val_spatial_transforms,
-                                     frames=80,
-                                     gamma_tau=gamma_tau,
-                                     crops=10)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size//2, shuffle=False,
-                                                num_workers=12, pin_memory=True)
+    val_dataset = UCF101(split_file=anno,
+                         split='validation',
+                         root=root,
+                         num_classes=26,
+                         spatial_transform=val_spatial_transforms,
+                         frames=80,
+                         gamma_tau=gamma_tau,
+                         crops=10)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset,
+                                                 batch_size=batch_size//2,
+                                                 shuffle=False,
+                                                 num_workers=4,
+                                                 pin_memory=True)
 
     dataloaders = {'train': dataloader, 'val': val_dataloader}
     datasets = {'train': dataset, 'val': val_dataset}
@@ -118,7 +133,8 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     save_model = model_save_path + '/x3d_ta2_rgb_sgd_'
     # TODO: what is replace_logits
     # x3d.replace_logits(88)
-    x3d.replace_logits(101)
+    # x3d.replace_logits(101)
+    x3d.replace_logits(26)
 
     if steps>0:
         load_ckpt = torch.load(model_save_path + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
@@ -171,8 +187,7 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                 bar.update(i)
                 if phase == 'train':
                     inputs, labels = data
-                    print("Checking input and label size")
-                    print(inputs.shape)
+                    # print("Checking in
 
                 else:
                     inputs, labels = data
@@ -189,10 +204,10 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                     # print("Check output size")
                     # print(logits.shape)
                     # print(probs.shape)
-
-                    print("@" * 30)
-                    print(logits)
-                    print("@" * 30)
+                    #
+                    # print("@" * 30)
+                    # print(logits)
+                    # print("@" * 30)
 
                 else:
                     with torch.no_grad():
@@ -220,7 +235,9 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                 if phase == 'train':
                     loss.backward()
 
-                if num_iter == num_steps_per_update and phase == 'train':
+                # if num_iter == num_steps_per_update and phase == 'train':
+                if                    \
+                        phase == 'train':
                     #lr_warmup(lr, steps-st_steps, warmup_steps, optimizer)
                     steps += 1
                     num_iter = 0
