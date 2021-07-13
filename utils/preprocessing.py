@@ -155,12 +155,19 @@ def convert_ucf_to_dict(dataset_path, csv_path, gen_test):
                 base_name, class_name = unique_list[i].split("@")
                 video_path = os.path.join(dataset_path, base_name)
 
-                train_keys.append(video_path)
-                train_key_labels.append(class_name)
+                # TODO: process test data into 2 parts
+                # Train: for feedback
+                # Validation: for test
+                if i % 2 != 0:  # 50% feedback data
+                    train_keys.append(video_path)
+                    train_key_labels.append(class_name)
+                else:  # 50%
+                    val_keys.append(video_path)
+                    val_key_labels.append(class_name)
             except:
                 print(i, unique_list[i].split("@"))
 
-        return train_keys, train_key_labels
+        # return train_keys, train_key_labels
 
     else:
         for i in range(len(unique_list)):
@@ -174,7 +181,7 @@ def convert_ucf_to_dict(dataset_path, csv_path, gen_test):
                 val_keys.append(video_path)
                 val_key_labels.append(class_name)
 
-        return train_keys, val_keys, train_key_labels, val_key_labels
+    return train_keys, val_keys, train_key_labels, val_key_labels
 
 
 
@@ -255,9 +262,18 @@ def convert_TA2_to_json(train_csv_path,
                         dst_json_path,
                         gen_test,
                         process_hmdb51=False):
-    dst_data = {}
-    dst_data['database'] = {}
-    train_database, val_database = {}, {}
+    if gen_test:
+        dst_data_feedback = {}
+        dst_data_test = {}
+
+        dst_data_feedback['database'] = {}
+        dst_data_test['database'] = {}
+
+        train_database, val_database = {}, {}
+    else:
+        dst_data = {}
+        dst_data['database'] = {}
+        train_database, val_database = {}, {}
 
     for k in range(len(train_csv_path)):
         if gen_test:
@@ -265,18 +281,20 @@ def convert_TA2_to_json(train_csv_path,
                 labels, label_map = load_ucf_labels(train_csv_path[k])
 
 
-                train_keys, train_key_labels = convert_ucf_to_dict(video_dir_path[0],
-                                                                 train_csv_path[k],
-                                                                 gen_test=True)
+                train_keys, val_keys, train_key_labels, val_key_labels = convert_ucf_to_dict(video_dir_path[0],
+                                                                                             train_csv_path[k],
+                                                                                             gen_test=True)
 
-                dst_data['labels'] = labels
+                dst_data_feedback['labels'] = labels
+                dst_data_test['labels'] = labels
 
             elif train_mode[0] == "hmdb51":
                 labels = get_hmdb_labels(train_csv_path[k])
-                train_keys, train_key_labels= convert_ucf_to_dict(video_dir_path[0],
-                                                                 train_csv_path[k],
-                                                                 gen_test=True)
-                dst_data['labels'] = labels
+                train_keys, val_keys, train_key_labels, val_key_labels= convert_ucf_to_dict(video_dir_path[0],
+                                                                                             train_csv_path[k],
+                                                                                             gen_test=True)
+                dst_data_feedback['labels'] = labels
+                dst_data_test['labels'] = labels
 
             else:
                 pass
@@ -314,75 +332,112 @@ def convert_TA2_to_json(train_csv_path,
 
     # HMDB51 has subfolders for each class, so we need to process in a different way
     if process_hmdb51:
-        if gen_test:
-            for i in range(len(train_keys)):
-                old_key = train_keys[i]
-                key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
-                train_database[key] = {}
-                train_database[key]['subset'] = 'test'
-                train_database[key]['annotations'] = {'label': train_key_labels[i]}
+        # if gen_test:
+        #     for i in range(len(train_keys)):
+        #         old_key = train_keys[i]
+        #         key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
+        #         train_database[key] = {}
+        #         train_database[key]['subset'] = 'test'
+        #         train_database[key]['annotations'] = {'label': train_key_labels[i]}
 
-        else:
-            for i in range(len(train_keys)):
-                old_key = train_keys[i]
-                key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
-                train_database[key] = {}
-                train_database[key]['subset'] = 'training'
-                train_database[key]['annotations'] = {'label': train_key_labels[i]}
+        # else:
+        for i in range(len(train_keys)):
+            old_key = train_keys[i]
+            key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
+            train_database[key] = {}
+            train_database[key]['subset'] = 'feedback_set'
+            train_database[key]['annotations'] = {'label': train_key_labels[i]}
 
-            for i in range(len(val_keys)):
-                old_key = val_keys[i]
-                key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
-                val_database[key] = {}
-                val_database[key]['subset'] = 'validation'
-                val_database[key]['annotations'] = {'label': val_key_labels[i]}
+        for i in range(len(val_keys)):
+            old_key = val_keys[i]
+            key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
+            val_database[key] = {}
+            val_database[key]['subset'] = 'test_set'
+            val_database[key]['annotations'] = {'label': val_key_labels[i]}
 
     else:
-        if gen_test:
-            for i in range(len(train_keys)):
-                key = train_keys[i]
-                train_database[key] = {}
-                train_database[key]['subset'] = 'testing'
-                label = train_key_labels[i]
-                train_database[key]['annotations'] = {'label': label}
+        # if gen_test:
+        #     for i in range(len(train_keys)):
+        #         key = train_keys[i]
+        #         train_database[key] = {}
+        #         train_database[key]['subset'] = 'testing'
+        #         label = train_key_labels[i]
+        #         train_database[key]['annotations'] = {'label': label}
+        #
+        # else:
+        for i in range(len(train_keys)):
+            key = train_keys[i]
+            train_database[key] = {}
+            train_database[key]['subset'] = 'feedback_set'
+            label = train_key_labels[i]
+            train_database[key]['annotations'] = {'label': label}
 
-        else:
-            for i in range(len(train_keys)):
-                key = train_keys[i]
-                train_database[key] = {}
-                train_database[key]['subset'] = 'training'
-                label = train_key_labels[i]
-                train_database[key]['annotations'] = {'label': label}
-
-            for i in range(len(val_keys)):
-                key = val_keys[i]
-                val_database[key] = {}
-                val_database[key]['subset'] = 'validation'
-                label = val_key_labels[i]
-                val_database[key]['annotations'] = {'label': label}
+        for i in range(len(val_keys)):
+            key = val_keys[i]
+            val_database[key] = {}
+            val_database[key]['subset'] = 'test_set'
+            label = val_key_labels[i]
+            val_database[key]['annotations'] = {'label': label}
 
     if gen_test:
-        dst_data['database'].update(train_database)
+        dst_data_feedback['database'].update(train_database)
+        dst_data_test['database'].update(val_database)
     else:
         dst_data['database'].update(train_database)
         dst_data['database'].update(val_database)
 
-    cnt = 0
-    
-    for video_path, frame_range in dst_data['database'].items():
-        cnt += 1
-        if cnt % 100 == 0:
-            print("parsing sample {}/{}...".format(cnt, len(train_keys)))
-        try:
-            n_frames = get_n_frames(video_path)
-            frame_range['annotations']['segment'] = (1, n_frames)
-        except:
-            continue
 
-    with open(dst_json_path, 'w') as dst_file:
-        # json.dump(dst_data, dst_file, cls=SetEncoder)
-        json.dump(dst_data, dst_file, default=set_default)
-        # json.dump(dst_data, dst_file)
+
+    if gen_test:
+        cnt = 0
+        print("Processing feedback set")
+        for video_path, frame_range in dst_data_feedback['database'].items():
+            cnt += 1
+            if cnt % 100 == 0:
+                print("parsing sample {}/{}...".format(cnt, len(train_keys)))
+            try:
+                n_frames = get_n_frames(video_path)
+                frame_range['annotations']['segment'] = (1, n_frames)
+            except:
+                continue
+
+        cnt = 0
+        print("Processing test set")
+        for video_path, frame_range in dst_data_test['database'].items():
+            cnt += 1
+            if cnt % 100 == 0:
+                print("parsing sample {}/{}...".format(cnt, len(val_keys)))
+            try:
+                n_frames = get_n_frames(video_path)
+                frame_range['annotations']['segment'] = (1, n_frames)
+            except:
+                continue
+
+        with open(dst_json_path[0], 'w') as dst_file_feedback:
+            json.dump(dst_data_feedback, dst_file_feedback, default=set_default)
+            print("data saved to %s" % dst_json_path[0])
+
+        with open(dst_json_path[1], 'w') as dst_file_test:
+            json.dump(dst_data_test, dst_file_test, default=set_default)
+            print("data saved to %s" % dst_json_path[1])
+
+    else:
+        cnt = 0
+
+        for video_path, frame_range in dst_data['database'].items():
+            cnt += 1
+            if cnt % 100 == 0:
+                print("parsing sample {}/{}...".format(cnt, len(train_keys)))
+            try:
+                n_frames = get_n_frames(video_path)
+                frame_range['annotations']['segment'] = (1, n_frames)
+            except:
+                continue
+
+        with open(dst_json_path, 'w') as dst_file:
+            # json.dump(dst_data, dst_file, cls=SetEncoder)
+            json.dump(dst_data, dst_file, default=set_default)
+            # json.dump(dst_data, dst_file)
 
 
 
@@ -410,8 +465,8 @@ def get_hmdb51_data(data_dir):
 
 
 if __name__ == '__main__':
-    # dataset_name = "hmdb"
-    dataset_name = "ucf101"
+    dataset_name = "hmdb"
+    # dataset_name = "ucf101"
 
     if dataset_name == "ucf101":
         train_mode = ['ucf101']
@@ -449,20 +504,25 @@ if __name__ == '__main__':
         test_known_csv = [test_known_csv_path]
         test_unknown_csv = [test_unknown_csv_path]
 
-        dst_test_known_json_path = dst_path + 'ta2_partition_0_test_known.json'
-        dst_test_unknown_json_path = dst_path + 'ta2_partition_0_test_unknown.json'
+        dst_test_known_json_path_feedback = dst_path + 'ta2_partition_0_test_known_feedback.json'
+        dst_test_known_json_path_test = dst_path + 'ta2_partition_0_test_known_test.json'
+
+        dst_test_unknown_json_path_feedback = dst_path + 'ta2_partition_0_test_unknown_feedback.json'
+        dst_test_unknown_json_path_test = dst_path + 'ta2_partition_0_test_unknown_test.json'
 
         convert_TA2_to_json(train_csv_path=test_known_csv,
                             train_mode=train_mode,
                             video_dir_path=video_path,
-                            dst_json_path=dst_test_known_json_path,
+                            dst_json_path=[dst_test_known_json_path_feedback,
+                                           dst_test_known_json_path_test],
                             gen_test=True,
                             process_hmdb51=False)
 
         convert_TA2_to_json(train_csv_path=test_unknown_csv,
                             train_mode=train_mode,
                             video_dir_path=video_path,
-                            dst_json_path=dst_test_unknown_json_path,
+                            dst_json_path=[dst_test_unknown_json_path_feedback,
+                                           dst_test_unknown_json_path_test],
                             gen_test=True,
                             process_hmdb51=False)
 
@@ -504,20 +564,28 @@ if __name__ == '__main__':
         test_known_csv = [test_known_csv_path]
         test_unknown_csv = [test_unknown_csv_path]
 
-        dst_test_known_json_path = dst_path + 'ta2_partition_0_test_known.json'
-        dst_test_unknown_json_path = dst_path + 'ta2_partition_0_test_unknown.json'
+        # dst_test_known_json_path = dst_path + 'ta2_partition_0_test_known.json'
+        # dst_test_unknown_json_path = dst_path + 'ta2_partition_0_test_unknown.json'
+
+        dst_test_known_json_path_feedback = dst_path + 'ta2_partition_0_test_known_feedback.json'
+        dst_test_known_json_path_test = dst_path + 'ta2_partition_0_test_known_test.json'
+
+        dst_test_unknown_json_path_feedback = dst_path + 'ta2_partition_0_test_unknown_feedback.json'
+        dst_test_unknown_json_path_test = dst_path + 'ta2_partition_0_test_unknown_test.json'
 
         convert_TA2_to_json(train_csv_path=test_known_csv,
                             train_mode=train_mode,
                             video_dir_path=video_path,
-                            dst_json_path=dst_test_known_json_path,
+                            dst_json_path=[dst_test_known_json_path_feedback,
+                                           dst_test_known_json_path_test],
                             gen_test=True,
                             process_hmdb51=True)
 
         convert_TA2_to_json(train_csv_path=test_unknown_csv,
                             train_mode=train_mode,
                             video_dir_path=video_path,
-                            dst_json_path=dst_test_unknown_json_path,
+                            dst_json_path=[dst_test_unknown_json_path_feedback,
+                                           dst_test_unknown_json_path_test],
                             gen_test=True,
                             process_hmdb51=True)
 

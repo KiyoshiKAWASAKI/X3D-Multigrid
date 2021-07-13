@@ -9,6 +9,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="1fc73449-fff7-4e39-ae99-04a20250f52d" name="veydrus">
+        <fileTransfer rootFolder="/home/khq.kitware.com/jin.huang" accessType="SFTP" host="veydrus.kitware.com" port="22" sshConfigId="f65f588d-100d-4e0b-89a4-67acf417053e" sshConfig="jin.huang@veydrus.kitware.com:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

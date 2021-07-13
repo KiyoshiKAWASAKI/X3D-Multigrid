@@ -187,7 +187,6 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                 bar.update(i)
                 if phase == 'train':
                     inputs, labels = data
-                    # print("Checking in
 
                 else:
                     inputs, labels = data

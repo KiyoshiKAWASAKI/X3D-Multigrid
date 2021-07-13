@@ -3,6 +3,7 @@
   <component name="SshConfigs">
     <configs>
       <sshConfig authType="PASSWORD" host="tellurak.kitware.com" id="266a75db-6c87-47d7-b4e4-58cc0b8653b7" port="22" nameFormat="DESCRIPTIVE" username="jin.huang" />
+      <sshConfig authType="PASSWORD" host="veydrus.kitware.com" id="f65f588d-100d-4e0b-89a4-67acf417053e" port="22" nameFormat="DESCRIPTIVE" username="jin.huang" />
     </configs>
   </component>
 </project>

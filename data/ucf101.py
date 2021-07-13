@@ -96,6 +96,8 @@ def get_class_labels(data):
 def get_video_names_and_annotations(data, subset):
     video_names = []
     annotations = []
+    # print(data['database'].items()) # Correct
+
     for key, value in data['database'].items():
         this_subset = value['subset']
         if this_subset == subset:
@@ -118,6 +120,8 @@ def make_dataset(split_file, split, root, num_classes=26):
         data = json.load(f)
     video_names, annotations = get_video_names_and_annotations(data, split)
     class_to_idx = get_class_labels(data)
+
+    print(len(video_names))
 
     idx_to_class = {}
     for name, label in class_to_idx.items():
@@ -155,7 +159,10 @@ def make_dataset(split_file, split, root, num_classes=26):
 
 class UCF101(data_utl.Dataset):
 
-    def __init__(self, split_file, split, root, num_classes=88, spatial_transform=None, task='class', frames=80, gamma_tau=5, crops=1):
+    def __init__(self, split_file, split,
+                 root, num_classes=88, spatial_transform=None,
+                 task='class', frames=80, gamma_tau=5, crops=1,
+                 test_phase=False, is_feedback=False):
     # def __init__(self, split_file, split, root, num_classes=101, spatial_transform=None, task='class', frames=80, gamma_tau=5, crops=1):
 
         self.data = make_dataset(split_file, split, root, num_classes)
@@ -168,6 +175,10 @@ class UCF101(data_utl.Dataset):
         self.crops = crops
         self.split = split
         self.task = task
+        self.test_phase = test_phase
+        self.is_feedback = is_feedback
+
+
     def __getitem__(self, index):
         """
         Args:
@@ -175,15 +186,27 @@ class UCF101(data_utl.Dataset):
         Returns:
             tuple: (image, target) where target is class_index of the target class.
         """
-        if self.crops > 1:
-            self.split = 'validation'
+        if self.test_phase:
+            if self.is_feedback:
+                self.split = "feedback_set"
+            else:
+                self.split = "test_set"
+
+        else:
+            if self.crops > 1:
+                self.split = 'validation'
+
         vid, label, nf = self.data[index]
-        if self.split == 'validation':
+
+        if (self.split == "validation") or \
+            (self.split == "feedback_set") or \
+            (self.split == "test_set"):
             frames = nf
             start_f = 1
         else:
             frames = self.frames
             start_f = random.randint(1,nf-(self.frames+1))
+
         stride_f = self.gamma_tau
         imgs = load_rgb_frames(self.root, vid, start_f, frames, stride_f, self.loader)
         label = label[:, start_f-1:start_f-1+frames:1] #stride_f
@@ -196,10 +219,10 @@ class UCF101(data_utl.Dataset):
             imgs_l = [self.spatial_transform(Image.fromarray(img)) for img in imgs]
         imgs_l = torch.stack(imgs_l, 0).permute(1, 0, 2, 3) # T C H W --> C T H W
 
-        # print("@" * 20)
-        # print(imgs_l.shape)
-
-        if self.split == 'validation' and self.task == 'class': #self.crops > 1:
+        if ((self.split=='validation') or
+            (self.split=="feedback_set") or
+            (self.split=="test_set") ) \
+                and self.task == 'class': #self.crops > 1:
             step = int((imgs_l.shape[1] - 1 - self.frames//self.gamma_tau)//(self.crops-1))
             if step == 0:
                 clips = [imgs_l[:,:self.frames//self.gamma_tau,...] for i in range(self.crops)]
