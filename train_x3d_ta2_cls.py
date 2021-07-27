@@ -47,20 +47,21 @@ GPUS = 1
 X3D_VERSION = 'M'
 
 # This is the root dir to the npy file
-# TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
-TA2_ROOT = '/data/jin.huang/hmdb51/npy_json/0'
+TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+# TA2_ROOT = '/data/jin.huang/hmdb51/npy_json/0'
 
 # This is the path to json file
-# TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json'
-TA2_ANNO = '/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json'
+TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json'
+# TA2_ANNO = '/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json'
 
 # model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf"
-model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb"
+# model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb"
+model_save_path = "/data/jin.huang/models/x3d/thresholding/0722_ucf"
 
 # TODO: these need to be changed
 # TA2_DATASET_SIZE = {'train':13446, 'val':1491}
-# TA2_DATASET_SIZE = {'train':4235, 'val':471} # UCF101 TA2 split
-TA2_DATASET_SIZE = {'train':1906, 'val':212} # HMDB51 TA2 split
+TA2_DATASET_SIZE = {'train':4235, 'val':471} # UCF101 TA2 split
+# TA2_DATASET_SIZE = {'train':1906, 'val':212} # HMDB51 TA2 split
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
@@ -95,7 +96,7 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     dataset = UCF101(split_file=anno,
                      split='training',
                      root=root,
-                     num_classes=26,
+                     num_classes=51,
                      spatial_transform=train_spatial_transforms,
                      frames=80,
                      gamma_tau=gamma_tau,
@@ -109,7 +110,7 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     val_dataset = UCF101(split_file=anno,
                          split='validation',
                          root=root,
-                         num_classes=26,
+                         num_classes=51,
                          spatial_transform=val_spatial_transforms,
                          frames=80,
                          gamma_tau=gamma_tau,
@@ -134,7 +135,8 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     # TODO: what is replace_logits
     # x3d.replace_logits(88)
     # x3d.replace_logits(101)
-    x3d.replace_logits(26)
+    # x3d.replace_logits(26)
+    x3d.replace_logits(51)
 
     if steps>0:
         load_ckpt = torch.load(model_save_path + '/x3d_ta2_rgb_sgd_'+str(load_steps).zfill(6)+'.pt')
@@ -187,6 +189,9 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
                 bar.update(i)
                 if phase == 'train':
                     inputs, labels = data
+
+                    # print(inputs.shape)
+                    # print(labels.shape)
 
                 else:
                     inputs, labels = data

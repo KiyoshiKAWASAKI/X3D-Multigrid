@@ -18,6 +18,11 @@ from transforms.spatial_transforms import Compose, Normalize, ToTensor, \
 import sys
 import numpy as np
 
+from transforms.spatial_transforms_old import Compose, Normalize, \
+    RandomHorizontalFlip, MultiScaleRandomCrop, \
+    MultiScaleRandomCropMultigrid, ToTensor, \
+    CenterCrop, CenterCropScaled
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -31,45 +36,47 @@ os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
-BS = 4
+BS = 2
 BS_UPSCALE = 2
-INIT_LR = 0.02 * BS_UPSCALE
+INIT_LR = 0.005 * BS_UPSCALE
 GPUS = 1
 X3D_VERSION = 'M'
 
 ###############################
-dataset_used = "ucf101"
+dataset_used = "hmdb"
 test_known = True
 use_feedback = True
 threshold = 0.6
 
 update_fre = 4
 #################################
-
+# TODO ()
 if dataset_used == "ucf101":
-    TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
-    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
-    nb_classes = 88
-
-    if test_known == True:
-        if use_feedback == False:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-        else:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
-            TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_feedback.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-
-    else:
-        if use_feedback == False:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-        else:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
-            TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_feedback.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    pass
+    # TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+    # trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
+    # nb_classes = 88
+    #
+    # if test_known == True:
+    #     if use_feedback == False:
+    #         TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    #     else:
+    #         TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
+    #         TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_feedback.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    #
+    # else:
+    #     if use_feedback == False:
+    #         TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    #     else:
+    #         TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
+    #         TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_feedback.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
 
 else:
+    trainining_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json"
     TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
     trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
     nb_classes = 26
@@ -80,7 +87,7 @@ else:
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
             TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
     else:
         if use_feedback == False:
@@ -92,7 +99,15 @@ else:
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
 
 
-# warmup_steps=0
+def no_requires_grad(model, fixed_layer_names):
+    for layer_name in fixed_layer_names:
+        if hasattr(model, layer_name):
+            getattr(model, layer_name).requires_grad = False
+    else:
+        print(f"Trying to set non existent layer: {layer_name}")
+
+
+
 def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
 
     frames=80 # DOUBLED INSIDE DATASET, AS LONGER CLIPS
@@ -154,15 +169,16 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
 
 
     # Iterate over data.
-    for i in range(len(val_dataloader)):
-        bar.update(i)
-        print(i)
-        try:
-            inputs, labels = next(iter(val_dataloader))
+    # for i in range(len(val_dataloader)):
+    for i, data in enumerate(val_dataloader):
+        # bar.update(i)
+        # print(i)
+        # try:
+        inputs, labels = next(iter(val_dataloader))
             # print(inputs.shape)
-        except Exception as e:
-            print(e)
-            continue
+        # except Exception as e:
+        #     print(e)
+        #     continue
 
         b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
         inputs = inputs.view(b*n,c,t,h,w)
@@ -228,10 +244,33 @@ def run_with_feedback(root=TA2_ROOT,
     resize_size = {'S':[180.,225.], 'M':[256.,256.], 'XL':[360.,450.]}[X3D_VERSION] # 'M':[256.,320.] FOR LONGER SCHEDULE
     gamma_tau = {'S':6, 'M':5, 'XL':5}[X3D_VERSION] # DOUBLED INSIDE DATASET, AS LONGER CLIPS
 
+    train_spatial_transforms = Compose([MultiScaleRandomCropMultigrid([crop_size / i for i in resize_size], crop_size),
+                                        RandomHorizontalFlip(),
+                                        ToTensor(255),
+                                        Normalize(TA2_MEAN, TA2_STD)])
+
 
     val_spatial_transforms = Compose([CenterCropScaled(crop_size),
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
+
+    # TODO: Here is the dataloader for re-using the training data
+    train_dataset = UCF101(split_file=trainining_json_path,
+                             split='training',
+                             root=root,
+                             num_classes=nb_classes,
+                             spatial_transform=val_spatial_transforms,
+                             frames=80,
+                             gamma_tau=gamma_tau,
+                             crops=10,
+                             test_phase=True,
+                             is_feedback=True)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset,
+                                                 batch_size=batch_size // 2,
+                                                 shuffle=False,
+                                                 num_workers=0,
+                                                 pin_memory=True)
+
 
 
     # TODO: here is the dataloader for testing
@@ -281,6 +320,19 @@ def run_with_feedback(root=TA2_ROOT,
     x3d.load_state_dict(load_ckpt['model_state_dict'])
 
     x3d.cuda()
+
+    # TODO: freeze some layers
+    for name, param in x3d.named_parameters():
+        if param.requires_grad:
+            print(name, param.data)
+    # count = 0
+    # for parameter in x3d.parameters():
+    #     if count != 316:
+    #         parameter.requires_grad = False
+    #         count += 1
+    #     else:
+    #         parameter.requires_grad = True
+
     x3d = nn.DataParallel(x3d)
     print('model loaded')
 
@@ -298,138 +350,72 @@ def run_with_feedback(root=TA2_ROOT,
     print('INIT LR: %f' % lr)
 
     optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
-    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
-    # if steps > 0:
-    #     optimizer.load_state_dict(load_ckpt['optimizer_state_dict'])
-    #     lr_sched.load_state_dict(load_ckpt['scheduler_state_dict'])
+    # lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
 
     criterion = nn.BCEWithLogitsLoss()
-
     x3d.train(True)
     torch.autograd.set_grad_enabled(True)
     optimizer.zero_grad()
 
-    print(epochs)
-
 
     # Iterate over data.
-    # while epochs < 1:
     total_loss = 0
 
-    input_stack = None
-
     # TODO: Use feedback set for updating and fine-tuning
+    # TODO: first step, only using knowns
+    train_dataloader_iterator = iter(train_dataloader)
+
     for i, data in enumerate(feedback_dataloader):
-        bar.update(i)
-        inputs, labels = data
+        data_feedback, labels_feedback = data
 
-        b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
-        inputs = inputs.view(b*n,c,t,h,w)
-        # inputs = inputs.view(b,c,t,h,w)
+        try:
+            data_train, labels_train = next(train_dataloader_iterator)
+        except StopIteration:
+            train_dataloader_iterator = iter(train_dataloader)
+            data_train, labels_train = next(train_dataloader_iterator)
 
+        # TODO: Just update the network every 4 steps
+        if (i == 3) or (i % 4 == 3):
+            # Get data from training set and feedback set
+            b_fb, n_fb, c_fb, t_fb, h_fb, w_fb = data_feedback.shape
+            data_feedback = data_feedback.view(b_fb * n_fb, c_fb, t_fb, h_fb, w_fb)
 
-        print("\n")
-        print("#" * 20)
-        print("i ", i)
-        print("inputs shape ", inputs.shape) # [40, 3, 16, 224, 224]
-        print("label shape ", labels.shape) #[4, 88]
+            b_train, n_train, c_train, t_train, h_train, w_train = data_train.shape
+            data_train = data_train.view(b_train * n_train, c_train, t_train, h_train, w_train)
 
+            # Stack the input and use it to update the network
+            inputs = torch.cat((data_feedback, data_train), dim=0)
+            labels = torch.cat((labels_feedback, labels_train), dim=0)
 
-        # TODO: Grab some data
-        inputs = inputs[: int(0.5*b*n), :, :, :, :]
-        labels = labels[: int(0.5*labels.shape[0]), :]
+            inputs = inputs.cuda()
+            labels = labels.cuda()
 
-        if i % 2 == 0:
-            input_stack = inputs
-            label_stack = labels
+            print("input shape:", inputs.shape)
+            print("label shape", labels.shape)
 
-        input_feedback = torch.cat((input_stack, inputs), dim=0)
-        label_feedback = torch.cat((label_stack, labels), dim=0)
-
-        print("input_feedback: ", input_feedback.shape)
-        print("label_feedback: ", label_feedback.shape)
-        print("#" * 20)
-
-        ####################################################
-        # Above is correct
-        ####################################################
-        # TODO: update once every 2 steps (1,3,5...)
-        if (i != 0) and (i % 2 == 1):
-            print("!! Updating network here")
-            inputs = input_feedback.cuda()
-            labels = label_feedback.cuda()
-
-            print("input after stack", inputs.shape)
-            print("label after stack", labels.shape)
-
+            # TODO: Updating network
             logits, feat, base = x3d(inputs)
 
             logits = logits.squeeze(2) # B C
-            print(logits.shape)
-            logits = logits.view(b,n,logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
-            probs = F.sigmoid(logits)
-            print(logits.shape)
-            print(probs.shape)
-
-            probs = torch.max(probs, dim=1)[0]
+            logits = logits.view(b_fb*2, n_fb, logits.shape[1])
             logits = torch.max(logits, dim=1)[0]
+            probs = F.sigmoid(logits)
+
 
             loss = criterion(logits, labels)
             total_loss += loss.item()
+            loss.requres_grad = True
             loss.backward()
 
             feedback_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
-            # TODO: Testing unknown
+            # TODO: Do test here
             if test_known == False:
-                print("Testing unknown. Threshold %f" % threshold)
-                count_correct = 0
-                count_wrong = 0
-                sm = torch.nn.Softmax(dim=1)
+                pass
 
-                print("Testing the whole validation set (unknown)...")
-                for k in range(len(val_dataloader)):
-                    inputs, labels = next(iter(val_dataloader))
-
-                    b, n, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
-                    inputs = inputs.view(b * n, c, t, h, w)
-
-                    inputs = inputs.cuda()  # B 3 T W H
-                    labels = labels.cuda()  # B C
-
-                    with torch.no_grad():
-                        logits, feat, base = x3d(inputs)
-
-                    logits = logits.squeeze(2)  # B C
-                    logits = logits.view(b, n, logits.shape[1])
-
-                    probs = F.sigmoid(logits)
-
-                    probs = torch.max(probs, dim=1)[0]
-                    logits = torch.max(logits, dim=1)[0]
-
-                    # TODO: Get max probability for each sample
-                    probs_sm = sm(probs)
-
-                    for one_prob in probs_sm:
-                        max_prob = torch.max(one_prob)
-
-                        if max_prob > threshold:
-                            count_wrong += 1
-                        else:
-                            count_correct += 1
-
-                print("Step %d" % i)
-                print("Total unknown samples: %d" % (count_correct + count_wrong))
-                print("Unknown as unknown: %d" % count_correct)
-                print("Unknown as known: %d" % count_wrong)
-                print("Accuracy: %f" % (float(count_correct) / (float(count_correct + count_wrong))))
-
-            # TODO: testing for known
             else:
-                print("Testing the whole validation set (known)...")
-                for k in range(len(val_dataloader)):
-                    inputs, labels = next(iter(val_dataloader))
+                for k, data in enumerate(val_dataloader):
+                    inputs, labels = data
 
                     b, n, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
                     inputs = inputs.view(b * n, c, t, h, w)
@@ -442,7 +428,6 @@ def run_with_feedback(root=TA2_ROOT,
 
                     logits = logits.squeeze(2)  # B C
                     logits = logits.view(b, n, logits.shape[1])
-
                     probs = F.sigmoid(logits)
 
                     probs = torch.max(probs, dim=1)[0]
@@ -453,8 +438,14 @@ def run_with_feedback(root=TA2_ROOT,
                 val_map = val_apm.value().mean()
                 print('Epoch (testing after updating the network):{} val mAP: {:.4f}'.format(epochs, val_map))
 
+
+
+
+
+
         else:
             continue
+
 
 
 

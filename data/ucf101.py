@@ -16,6 +16,7 @@ from PIL import Image
 import pdb
 import cv2
 from utils.transform import Transforms
+import sys
 
 
 def pil_loader(path):
@@ -97,13 +98,14 @@ def get_video_names_and_annotations(data, subset):
     video_names = []
     annotations = []
     # print(data['database'].items()) # Correct
+    # print("subset", subset)
 
     for key, value in data['database'].items():
         this_subset = value['subset']
         if this_subset == subset:
-            # label = value['annotations']['label']
             video_names.append(key)
             annotations.append(value['annotations'])
+
     return video_names, annotations
 
 
@@ -114,14 +116,16 @@ def load_rgb_frames(image_dir, vid, start, num, stride, video_loader):
     return frames
 
 # def make_dataset(split_file, split, root, num_classes=101):
-def make_dataset(split_file, split, root, num_classes=26):
+# def make_dataset(split_file, split, root, num_classes=26):
+def make_dataset(split_file, split, root, num_classes=51):
+    print("split ", split)
     dataset = []
     with open(split_file, 'r') as f:
         data = json.load(f)
     video_names, annotations = get_video_names_and_annotations(data, split)
     class_to_idx = get_class_labels(data)
 
-    print(len(video_names))
+    print("video names", len(video_names))
 
     idx_to_class = {}
     for name, label in class_to_idx.items():
@@ -131,6 +135,10 @@ def make_dataset(split_file, split, root, num_classes=26):
     if os.path.exists(pre_data_file):
         print('{} exists'.format(pre_data_file))
         dataset = np.load(pre_data_file, allow_pickle=True)
+
+        # print("dataset:")
+        # print(dataset[100][1])
+
     else:
         print('{} does not exist'.format(pre_data_file))
         for i in range(len(video_names)):
@@ -178,6 +186,12 @@ class UCF101(data_utl.Dataset):
         self.test_phase = test_phase
         self.is_feedback = is_feedback
 
+        # This part is correct
+        # print("&" * 20)
+        # print(self.data[100][1])
+        # print("&" * 20)
+        # sys.exit()
+
 
     def __getitem__(self, index):
         """
@@ -186,6 +200,7 @@ class UCF101(data_utl.Dataset):
         Returns:
             tuple: (image, target) where target is class_index of the target class.
         """
+
         if self.test_phase:
             if self.is_feedback:
                 self.split = "feedback_set"
@@ -197,6 +212,9 @@ class UCF101(data_utl.Dataset):
                 self.split = 'validation'
 
         vid, label, nf = self.data[index]
+        # print("index", index)
+
+        # print("@" *
 
         if (self.split == "validation") or \
             (self.split == "feedback_set") or \
@@ -236,8 +254,14 @@ class UCF101(data_utl.Dataset):
                 # print(clips.shape)
         else:
             clips = imgs_l
+        #
+        # print(label.shape)
+        # print(label)
 
-        # print("@" * 20)
+        # for i in range(label.shape[0]):
+        #     one_hot_label = label[i]
+        #     # one_label = torch.argmax(one_hot_label)
+        #     print("[data loader] one_label in for loop", one_label)
 
         return clips, label
 
