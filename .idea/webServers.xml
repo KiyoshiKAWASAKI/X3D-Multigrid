@@ -2,18 +2,12 @@
 <project version="4">
   <component name="WebServers">
     <option name="servers">
-      <webServer id="cd4bf559-874f-4a4e-ac61-5e60908d8640" name="tellurak">
-        <fileTransfer rootFolder="/home/local/KHQ/jin.huang" accessType="SFTP" host="tellurak.kitware.com" port="22" sshConfigId="266a75db-6c87-47d7-b4e4-58cc0b8653b7" sshConfig="jin.huang@tellurak.kitware.com:22 password">
+      <webServer id="d07270a4-95f0-4d39-b4e4-de569e2be1d3" name="CRC" url="http://crcfe02.crc.nd.edu">
+        <fileTransfer host="crcfe02.crc.nd.edu" port="22" rootFolder="/afs/crc.nd.edu/user/j/jhuang24" accessType="SFTP">
           <advancedOptions>
-            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
           </advancedOptions>
-        </fileTransfer>
-      </webServer>
-      <webServer id="1fc73449-fff7-4e39-ae99-04a20250f52d" name="veydrus">
-        <fileTransfer rootFolder="/home/khq.kitware.com/jin.huang" accessType="SFTP" host="veydrus.kitware.com" port="22" sshConfigId="f65f588d-100d-4e0b-89a4-67acf417053e" sshConfig="jin.huang@veydrus.kitware.com:22 password">
-          <advancedOptions>
-            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
-          </advancedOptions>
+          <option name="port" value="22" />
         </fileTransfer>
       </webServer>
     </option>

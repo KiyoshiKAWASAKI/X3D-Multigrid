@@ -27,7 +27,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='0', type=str)
+parser.add_argument('-gpu', default='1', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
@@ -50,7 +50,6 @@ threshold = 0.6
 
 update_fre = 4
 #################################
-# TODO ()
 if dataset_used == "ucf101":
     pass
     # TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
@@ -76,26 +75,26 @@ if dataset_used == "ucf101":
     #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
 
 else:
-    trainining_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json"
-    TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
-    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+    trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_10_folds_partition_0.json"
+    TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
+    trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
     nb_classes = 26
 
     if test_known == True:
         if use_feedback == False:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
     else:
         if use_feedback == False:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
 
 
@@ -104,7 +103,7 @@ def no_requires_grad(model, fixed_layer_names):
         if hasattr(model, layer_name):
             getattr(model, layer_name).requires_grad = False
     else:
-        print(f"Trying to set non existent layer: {layer_name}")
+        print("Trying to set non existent layer.")
 
 
 
@@ -324,7 +323,9 @@ def run_with_feedback(root=TA2_ROOT,
     # TODO: freeze some layers
     for name, param in x3d.named_parameters():
         if param.requires_grad:
-            print(name, param.data)
+            # print(name, param.data)
+            pass
+
     # count = 0
     # for parameter in x3d.parameters():
     #     if count != 316:

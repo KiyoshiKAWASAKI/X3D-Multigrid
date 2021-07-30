@@ -332,59 +332,80 @@ def convert_TA2_to_json(train_csv_path,
 
     # HMDB51 has subfolders for each class, so we need to process in a different way
     if process_hmdb51:
-        # if gen_test:
-        #     for i in range(len(train_keys)):
-        #         old_key = train_keys[i]
-        #         key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
-        #         train_database[key] = {}
-        #         train_database[key]['subset'] = 'test'
-        #         train_database[key]['annotations'] = {'label': train_key_labels[i]}
+        if gen_test:
+            for i in range(len(train_keys)):
+                old_key = train_keys[i]
+                key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'feedback_set'
+                train_database[key]['annotations'] = {'label': train_key_labels[i]}
 
-        # else:
-        for i in range(len(train_keys)):
-            old_key = train_keys[i]
-            key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
-            train_database[key] = {}
-            train_database[key]['subset'] = 'feedback_set'
-            train_database[key]['annotations'] = {'label': train_key_labels[i]}
+            for i in range(len(val_keys)):
+                old_key = val_keys[i]
+                key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
+                val_database[key] = {}
+                val_database[key]['subset'] = 'test_set'
+                val_database[key]['annotations'] = {'label': val_key_labels[i]}
 
-        for i in range(len(val_keys)):
-            old_key = val_keys[i]
-            key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
-            val_database[key] = {}
-            val_database[key]['subset'] = 'test_set'
-            val_database[key]['annotations'] = {'label': val_key_labels[i]}
+            dst_data_feedback['database'].update(train_database)
+            dst_data_test['database'].update(val_database)
+
+
+        else:
+            for i in range(len(train_keys)):
+                old_key = train_keys[i]
+                key = video_dir_path[0] + train_key_labels[i] + "/" + old_key.split("/")[-1]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'training'
+                train_database[key]['annotations'] = {'label': train_key_labels[i]}
+
+            for i in range(len(val_keys)):
+                old_key = val_keys[i]
+                key = video_dir_path[0] + val_key_labels[i] + "/" + old_key.split("/")[-1]
+                val_database[key] = {}
+                val_database[key]['subset'] = 'validation'
+                val_database[key]['annotations'] = {'label': val_key_labels[i]}
+
+            dst_data['database'].update(train_database)
+            dst_data['database'].update(val_database)
+
+
 
     else:
-        # if gen_test:
-        #     for i in range(len(train_keys)):
-        #         key = train_keys[i]
-        #         train_database[key] = {}
-        #         train_database[key]['subset'] = 'testing'
-        #         label = train_key_labels[i]
-        #         train_database[key]['annotations'] = {'label': label}
-        #
-        # else:
-        for i in range(len(train_keys)):
-            key = train_keys[i]
-            train_database[key] = {}
-            train_database[key]['subset'] = 'feedback_set'
-            label = train_key_labels[i]
-            train_database[key]['annotations'] = {'label': label}
+        if gen_test:
+            for i in range(len(train_keys)):
+                key = train_keys[i]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'feedback_set'
+                label = train_key_labels[i]
+                train_database[key]['annotations'] = {'label': label}
 
-        for i in range(len(val_keys)):
-            key = val_keys[i]
-            val_database[key] = {}
-            val_database[key]['subset'] = 'test_set'
-            label = val_key_labels[i]
-            val_database[key]['annotations'] = {'label': label}
+            for i in range(len(val_keys)):
+                key = val_keys[i]
+                val_database[key] = {}
+                val_database[key]['subset'] = 'test_set'
+                label = val_key_labels[i]
+                val_database[key]['annotations'] = {'label': label}
 
-    if gen_test:
-        dst_data_feedback['database'].update(train_database)
-        dst_data_test['database'].update(val_database)
-    else:
-        dst_data['database'].update(train_database)
-        dst_data['database'].update(val_database)
+            dst_data_feedback['database'].update(train_database)
+            dst_data_test['database'].update(val_database)
+        else:
+            for i in range(len(train_keys)):
+                key = train_keys[i]
+                train_database[key] = {}
+                train_database[key]['subset'] = 'training'
+                label = train_key_labels[i]
+                train_database[key]['annotations'] = {'label': label}
+
+            for i in range(len(val_keys)):
+                key = val_keys[i]
+                val_database[key] = {}
+                val_database[key]['subset'] = 'validation'
+                label = val_key_labels[i]
+                val_database[key]['annotations'] = {'label': label}
+
+            dst_data['database'].update(train_database)
+            dst_data['database'].update(val_database)
 
 
 
@@ -438,6 +459,7 @@ def convert_TA2_to_json(train_csv_path,
             # json.dump(dst_data, dst_file, cls=SetEncoder)
             json.dump(dst_data, dst_file, default=set_default)
             # json.dump(dst_data, dst_file)
+            print("data saved to %s" % dst_json_path)
 
 
 
@@ -470,19 +492,22 @@ if __name__ == '__main__':
 
     if dataset_name == "ucf101":
         train_mode = ['ucf101']
-        video_path = ['/data/dawei.du/datasets/UCF101/']
+        video_path = ['/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/UCF101/']
 
-        dir_path = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/' #Path of label directory
-        dst_path = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/' # Directory path of dst json file.
-        dst_json_path = dst_path + '_partition_0.json'
+        dir_path = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc/' #Path of label directory
+        dst_path = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc/' # Directory path of dst json file.
+        dst_json_path = dst_path + 'ta2_10_folds_partition_0.json'
 
-        train_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/seen_training_filelist_0.txt"
-        test_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/seen_test_filelist_0.txt"
-        test_unknown_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/unseen_filelist_0.txt"
+        # train_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/seen_training_filelist_0.txt"
+        # test_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/seen_test_filelist_0.txt"
+        # test_unknown_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/UCF101_NoveltySplits/0/unseen_filelist_0.txt"
 
-        train_known_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/train_known_0.csv"
-        test_known_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/test_known_0.csv"
-        test_unknown_csv_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/test_unknown_0.csv"
+        train_known_csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                               "ucf101_npy_json/ta2_10_folds/0/train_known_0.csv"
+        test_known_csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                              "ucf101_npy_json/ta2_10_folds/0/test_known_0.csv"
+        test_unknown_csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                                "ucf101_npy_json/ta2_10_folds/0/test_unknown_0.csv"
 
         # process_ucf_txt2csv(src_txt_path=train_known_txt_path,
         #                     save_csv_path=train_known_csv_path)
@@ -495,11 +520,11 @@ if __name__ == '__main__':
         train_csv_path = [train_known_csv_path]
         test_csv_path = []
 
-        # convert_TA2_to_json(train_csv_path=train_csv_path,
-        #                     train_mode=train_mode,
-        #                     video_dir_path=video_path,
-        #                     dst_json_path=dst_json_path,
-        #                     gen_test=False)
+        convert_TA2_to_json(train_csv_path=train_csv_path,
+                            train_mode=train_mode,
+                            video_dir_path=video_path,
+                            dst_json_path=dst_json_path,
+                            gen_test=False)
 
         test_known_csv = [test_known_csv_path]
         test_unknown_csv = [test_unknown_csv_path]
@@ -510,40 +535,40 @@ if __name__ == '__main__':
         dst_test_unknown_json_path_feedback = dst_path + 'ta2_partition_0_test_unknown_feedback.json'
         dst_test_unknown_json_path_test = dst_path + 'ta2_partition_0_test_unknown_test.json'
 
-        convert_TA2_to_json(train_csv_path=test_known_csv,
-                            train_mode=train_mode,
-                            video_dir_path=video_path,
-                            dst_json_path=[dst_test_known_json_path_feedback,
-                                           dst_test_known_json_path_test],
-                            gen_test=True,
-                            process_hmdb51=False)
-
-        convert_TA2_to_json(train_csv_path=test_unknown_csv,
-                            train_mode=train_mode,
-                            video_dir_path=video_path,
-                            dst_json_path=[dst_test_unknown_json_path_feedback,
-                                           dst_test_unknown_json_path_test],
-                            gen_test=True,
-                            process_hmdb51=False)
+        # convert_TA2_to_json(train_csv_path=test_known_csv,
+        #                     train_mode=train_mode,
+        #                     video_dir_path=video_path,
+        #                     dst_json_path=[dst_test_known_json_path_feedback,
+        #                                    dst_test_known_json_path_test],
+        #                     gen_test=True,
+        #                     process_hmdb51=False)
+        #
+        # convert_TA2_to_json(train_csv_path=test_unknown_csv,
+        #                     train_mode=train_mode,
+        #                     video_dir_path=video_path,
+        #                     dst_json_path=[dst_test_unknown_json_path_feedback,
+        #                                    dst_test_unknown_json_path_test],
+        #                     gen_test=True,
+        #                     process_hmdb51=False)
 
     elif dataset_name == "hmdb":
-        hmdb51_rar = "/data/jin.huang/hmdb51/HMDB51"
+        hmdb51_rar = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/HMDB51"
         # get_hmdb51_data(data_dir=hmdb51_rar) # Uncomment this when doawloading the
 
         train_mode = ['hmdb51']
-        video_path = ['/data/jin.huang/hmdb51/HMDB51/']
+        video_path = ['/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/HMDB51/']
 
-        dir_path = '/data/jin.huang/hmdb51/npy_json/0/'  # Path of label directory
-        dst_path = '/data/jin.huang/hmdb51/npy_json/0/'  # Directory path of dst json file.
-        dst_json_path = dst_path + 'ta2_partition_0.json'
+        dir_path = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/'  # Path of label directory
+        dst_path = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/'  # Directory path of dst json file.
+        dst_json_path = dst_path + 'ta2_10_folds_partition_0.json'
 
-        train_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/HMDB51_NoveltySplits/0/seen_training_filelist_0.txt"
-        test_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/HMDB51_NoveltySplits/0/seen_test_filelist_0.txt"
-        test_unknown_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/HMDB51_NoveltySplits/0/unseen_filelist_0.txt"
+        # train_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/HMDB51_NoveltySplits/0/seen_training_filelist_0.txt"
+        # test_known_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/HMDB51_NoveltySplits/0/seen_test_filelist_0.txt"
+        # test_unknown_txt_path = "/data/dawei.du/datasets/NoveltyActionRecoSplits/HMDB51_NoveltySplits/0/unseen_filelist_0.txt"
 
-        train_known_csv_path = "/data/jin.huang/hmdb51/npy_json/0/train_known_0.csv"
-        test_known_csv_path = "/data/jin.huang/hmdb51/npy_json/0/test_known_0.csv"
-        test_unknown_csv_path = "/data/jin.huang/hmdb51/npy_json/0/test_unknown_0.csv"
+        train_known_csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0/train_known_0.csv"
+        test_known_csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0/test_known_0.csv"
+        test_unknown_csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0/test_unknown_0.csv"
 
         # Uncomment this when generating CSV files for HMDB51
         # process_hmdb_txt2csv(src_txt_path=train_known_txt_path,
@@ -559,6 +584,7 @@ if __name__ == '__main__':
         #                     train_mode=train_mode,
         #                     video_dir_path=video_path,
         #                     dst_json_path=dst_json_path,
+        #                     gen_test=False,
         #                     process_hmdb51=True)
 
         test_known_csv = [test_known_csv_path]

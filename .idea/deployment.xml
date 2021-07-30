@@ -1,18 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="veydrus" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="CRC" autoUploadExternalChanges="true">
     <serverData>
-      <paths name="tellurak">
+      <paths name="CRC">
         <serverdata>
           <mappings>
-            <mapping deploy="/research/X3D-Multigrid" local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="veydrus">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/research/X3D-Multigrid" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/Public/darpa_sail_on/X3D-Multigrid" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
+import logging
 
 import torchvision
 from torchvision import datasets, transforms
@@ -33,7 +34,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='1', type=str)
+parser.add_argument('-gpu', default='3', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
@@ -47,16 +48,21 @@ GPUS = 1
 X3D_VERSION = 'M'
 
 # This is the root dir to the npy file
-TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+TA2_ROOT = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
+           'ucf101_npy_json/ta2_10_folds/0_crc'
 # TA2_ROOT = '/data/jin.huang/hmdb51/npy_json/0'
 
 # This is the path to json file
-TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json'
+TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
+           'ucf101_npy_json/ta2_10_folds/0_crc/ta2_10_folds_partition_0.json'
 # TA2_ANNO = '/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0.json'
 
 # model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf"
 # model_save_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb"
-model_save_path = "/data/jin.huang/models/x3d/thresholding/0722_ucf"
+model_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                  "models/x3d/thresholding/0729_ucf"
+
+save_txt_dir = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/x3d/thresholding/0729_ucf/"
 
 # TODO: these need to be changed
 # TA2_DATASET_SIZE = {'train':13446, 'val':1491}
@@ -144,7 +150,6 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
 
     x3d.cuda()
     x3d = nn.DataParallel(x3d)
-    print('model loaded')
 
     lr = init_lr
     print ('INIT LR: %f'%lr)
@@ -161,120 +166,133 @@ def run(init_lr=INIT_LR, max_epochs=100, root=TA2_ROOT, anno=TA2_ANNO, batch_siz
     val_apm = APMeter()
     tr_apm = APMeter()
     best_map = 0
+
     while epochs < max_epochs:
-        print ('Step {} Epoch {}'.format(steps, epochs))
-        print ('-' * 10)
-        # Each epoch has a training and validation phase
-        for phase in ['train']+['val']:
-            bar_st = iterations_per_epoch if phase == 'train' else val_iterations_per_epoch
-            bar = pkbar.Pbar(name='update: ', target=bar_st)
-            if phase == 'train':
-                x3d.train(True)
-                epochs += 1
-                torch.autograd.set_grad_enabled(True)
-            else:
-                x3d.train(False)  # Set model to evaluate mode
-                _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS
-                torch.autograd.set_grad_enabled(False)
+    # while epochs < 2:
+        save_txt_path = save_txt_dir + "train_valid_stat_epoch_" + str(epochs) + ".txt"
 
-            tot_loss = 0.0
-            tot_cls_loss = 0.0
-            num_iter = 0
-            optimizer.zero_grad()
+        with open(save_txt_path, 'w') as f:
+            print ('Step {} Epoch {}'.format(steps, epochs))
+            print ('-' * 10)
 
-            # Iterate over data.
-            print(phase)
-            for i,data in enumerate(dataloaders[phase]):
-                num_iter += 1
-                bar.update(i)
+            # Each epoch has a training and validation phase
+            for phase in ['train']+['val']:
+                bar_st = iterations_per_epoch if phase == 'train' else val_iterations_per_epoch
+                bar = pkbar.Pbar(name='update: ', target=bar_st)
                 if phase == 'train':
-                    inputs, labels = data
-
-                    # print(inputs.shape)
-                    # print(labels.shape)
-
+                    x3d.train(True)
+                    epochs += 1
+                    torch.autograd.set_grad_enabled(True)
                 else:
-                    inputs, labels = data
-                    b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
-                    inputs = inputs.view(b*n,c,t,h,w)
+                    x3d.train(False)  # Set model to evaluate mode
+                    _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS
+                    torch.autograd.set_grad_enabled(False)
 
-                inputs = inputs.cuda() # B 3 T W H
-                labels = labels.cuda() # B C
+                tot_loss = 0.0
+                tot_cls_loss = 0.0
+                num_iter = 0
+                optimizer.zero_grad()
 
-                if phase == 'train':
-                    logits, _, _ = x3d(inputs)
-                    logits = logits.squeeze(2) # B C
-                    probs = F.sigmoid(logits)
-                    # print("Check output size")
-                    # print(logits.shape)
-                    # print(probs.shape)
-                    #
-                    # print("@" * 30)
-                    # print(logits)
-                    # print("@" * 30)
+                # Iterate over data.
+                print(phase)
+                for i,data in enumerate(dataloaders[phase]):
+                    num_iter += 1
+                    bar.update(i)
+                    if phase == 'train':
+                        inputs, labels = data
 
-                else:
-                    with torch.no_grad():
+                        # print(inputs.shape)
+                        # print(labels.shape)
+
+                    else:
+                        inputs, labels = data
+                        b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
+                        inputs = inputs.view(b*n,c,t,h,w)
+
+                    inputs = inputs.cuda() # B 3 T W H
+                    labels = labels.cuda() # B C
+
+                    if phase == 'train':
                         logits, _, _ = x3d(inputs)
-                    logits = logits.squeeze(2) # B C
-                    logits = logits.view(b,n,logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
-                    probs = F.sigmoid(logits)
-                    #probs = torch.mean(probs, 1)
-                    #logits = torch.mean(logits, 1)
-                    probs = torch.max(probs, dim=1)[0]
-                    logits = torch.max(logits, dim=1)[0]
+                        logits = logits.squeeze(2) # B C
+                        probs = F.sigmoid(logits)
+                        # print("Check output size")
+                        # print(logits.shape)
+                        # print(probs.shape)
+                        #
+                        # print("@" * 30)
+                        # print(logits)
+                        # print("@" * 30)
+
+                    else:
+                        with torch.no_grad():
+                            logits, _, _ = x3d(inputs)
+                        logits = logits.squeeze(2) # B C
+                        logits = logits.view(b,n,logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
+                        probs = F.sigmoid(logits)
+                        #probs = torch.mean(probs, 1)
+                        #logits = torch.mean(logits, 1)
+                        probs = torch.max(probs, dim=1)[0]
+                        logits = torch.max(logits, dim=1)[0]
 
 
-                cls_loss = criterion(logits, labels)
-                tot_cls_loss += cls_loss.item()
+                    cls_loss = criterion(logits, labels)
+                    tot_cls_loss += cls_loss.item()
 
-                if phase == 'train':
-                    tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
-                else:
-                    val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+                    if phase == 'train':
+                        tr_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+                    else:
+                        val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
-                loss = cls_loss/num_steps_per_update
-                tot_loss += loss.item()
+                    loss = cls_loss/num_steps_per_update
+                    tot_loss += loss.item()
 
-                if phase == 'train':
-                    loss.backward()
+                    if phase == 'train':
+                        loss.backward()
 
-                # if num_iter == num_steps_per_update and phase == 'train':
-                if                    \
-                        phase == 'train':
-                    #lr_warmup(lr, steps-st_steps, warmup_steps, optimizer)
-                    steps += 1
-                    num_iter = 0
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    s_times = iterations_per_epoch//2
-                    if (steps-load_steps) % s_times == 0:
-                        tr_map = tr_apm.value().mean()
-                        tr_apm.reset()
-                        print (' Epoch:{} {} steps: {} Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
-                            steps, tot_cls_loss/(s_times*num_steps_per_update), tot_loss/s_times, tr_map))#, tot_acc/(s_times*num_steps_per_update)))
-                        tot_loss = tot_cls_loss = 0.
-                    '''if steps % (1000) == 0:
+                    # if num_iter == num_steps_per_update and phase == 'train':
+                    if phase == 'train':
+                        #lr_warmup(lr, steps-st_steps, warmup_steps, optimizer)
+                        steps += 1
+                        num_iter = 0
+                        optimizer.step()
+                        optimizer.zero_grad()
+                        s_times = iterations_per_epoch//2
+                        if (steps-load_steps) % s_times == 0:
+                            tr_map = tr_apm.value().mean()
+                            tr_apm.reset()
+                            print (' Epoch:{} {} steps: {} Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
+                                steps, tot_cls_loss/(s_times*num_steps_per_update), tot_loss/s_times, tr_map))
+
+                            f.write (' Epoch:{} {} steps: {} Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
+                                                                                                                steps,
+                                                                                                                tot_cls_loss / (s_times * num_steps_per_update),
+                                                                                                                tot_loss / s_times,
+                                                                                                                tr_map))
+
+                            tot_loss = tot_cls_loss = 0.
+
+
+                if phase == 'val':
+                    val_map = val_apm.value().mean()
+                    lr_sched.step(tot_loss)
+                    val_apm.reset()
+                    print (' Epoch:{} {} Loc Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
+                        tot_cls_loss/num_iter, (tot_loss*num_steps_per_update)/num_iter, val_map))
+
+                    f.write (' Epoch:{} {} Loc Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
+                        tot_cls_loss/num_iter, (tot_loss*num_steps_per_update)/num_iter, val_map))
+
+                    tot_loss = tot_cls_loss = 0.
+                    if val_map > best_map:
                         ckpt = {'model_state_dict': x3d.module.state_dict(),
                                 'optimizer_state_dict': optimizer.state_dict(),
                                 'scheduler_state_dict': lr_sched.state_dict()}
-                        torch.save(ckpt, save_model+str(steps).zfill(6)+'.pt')'''
-
-            if phase == 'val':
-                val_map = val_apm.value().mean()
-                lr_sched.step(tot_loss)
-                val_apm.reset()
-                print (' Epoch:{} {} Loc Cls Loss: {:.4f} Tot Loss: {:.4f} mAP: {:.4f}\n'.format(epochs, phase,
-                    tot_cls_loss/num_iter, (tot_loss*num_steps_per_update)/num_iter, val_map))
-                tot_loss = tot_cls_loss = 0.
-                if val_map > best_map:
-                    ckpt = {'model_state_dict': x3d.module.state_dict(),
-                            'optimizer_state_dict': optimizer.state_dict(),
-                            'scheduler_state_dict': lr_sched.state_dict()}
-                    best_map = val_map
-                    best_epoch = epochs
-                    print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
-                    torch.save(ckpt, save_model+'best.pt')
+                        best_map = val_map
+                        best_epoch = epochs
+                        print (' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
+                        f.write(' Epoch:{} {} best mAP: {:.4f}\n'.format(best_epoch, phase, best_map))
+                        torch.save(ckpt, save_model+'best.pt')
 
 def lr_warmup(init_lr, cur_steps, warmup_steps, opt):
     start_after = 1

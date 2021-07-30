@@ -123,9 +123,17 @@ def make_dataset(split_file, split, root, num_classes=51):
     with open(split_file, 'r') as f:
         data = json.load(f)
     video_names, annotations = get_video_names_and_annotations(data, split)
+    # original_video_names, annotations = get_video_names_and_annotations(data, split)
     class_to_idx = get_class_labels(data)
 
+    # print(video_names)
     print("video names", len(video_names))
+    # TODO: Cannot use dawei's data on ND CRC
+    # video_names = []
+    # for one_video_name in original_video_names:
+    #     video_names.append("/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" +
+    #                        one_video_name.split("/")[-2] + "/" + one_video_name.split("/")[-1])
+
 
     idx_to_class = {}
     for name, label in class_to_idx.items():
@@ -226,7 +234,11 @@ class UCF101(data_utl.Dataset):
             start_f = random.randint(1,nf-(self.frames+1))
 
         stride_f = self.gamma_tau
+        # print("@" * 20)
+        # print(self.root)
+        # print("@" * 20)
         imgs = load_rgb_frames(self.root, vid, start_f, frames, stride_f, self.loader)
+
         label = label[:, start_f-1:start_f-1+frames:1] #stride_f
         label = torch.from_numpy(label)
         if self.task == 'class':
