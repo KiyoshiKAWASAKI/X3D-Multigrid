@@ -27,7 +27,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='1', type=str)
+parser.add_argument('-gpu', default='2', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
@@ -75,26 +75,26 @@ if dataset_used == "ucf101":
     #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
 
 else:
-    trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_10_folds_partition_0.json"
-    TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
-    trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+    trainining_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_10_folds_partition_0.json"
+    TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
+    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
     nb_classes = 26
 
     if test_known == True:
         if use_feedback == False:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
-            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
     else:
         if use_feedback == False:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
 
 
@@ -270,8 +270,6 @@ def run_with_feedback(root=TA2_ROOT,
                                                  num_workers=0,
                                                  pin_memory=True)
 
-
-
     # TODO: here is the dataloader for testing
     val_dataset = UCF101(split_file=anno,
                          split='test_set',
@@ -320,19 +318,29 @@ def run_with_feedback(root=TA2_ROOT,
 
     x3d.cuda()
 
-    # TODO: freeze some layers
-    for name, param in x3d.named_parameters():
-        if param.requires_grad:
-            # print(name, param.data)
-            pass
+    # TODO: Get the names of all layers
+    all_layer_names = []
+    for name, layer in x3d.named_modules():
+        all_layer_names.append(name)
 
-    # count = 0
-    # for parameter in x3d.parameters():
-    #     if count != 316:
-    #         parameter.requires_grad = False
-    #         count += 1
-    #     else:
-    #         parameter.requires_grad = True
+    # print(all_layer_names)
+
+    # TODO: freeze some layers
+    # no_requires_grad(model=x3d, fixed_layer_names=all_layer_names[0])
+
+    params = x3d.state_dict()
+    # print(params.keys())
+    keys = list(params.keys())
+
+    for name, param in x3d.named_parameters():
+        if param.requires_grad and \
+                name != "fc2.weight" and name != "fc2.bias" \
+                and name != "fc1.weight":
+            param.requires_grad = False
+            # print(name)
+
+    # sys.exit()
+
 
     x3d = nn.DataParallel(x3d)
     print('model loaded')
@@ -350,7 +358,8 @@ def run_with_feedback(root=TA2_ROOT,
     lr = init_lr
     print('INIT LR: %f' % lr)
 
-    optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
+    # optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
+    optimizer = optim.SGD(filter(lambda p: p.requires_grad, x3d.parameters()), lr=lr, momentum=0.9, weight_decay=1e-5)
     # lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
 
     criterion = nn.BCEWithLogitsLoss()
@@ -391,10 +400,11 @@ def run_with_feedback(root=TA2_ROOT,
             inputs = inputs.cuda()
             labels = labels.cuda()
 
-            print("input shape:", inputs.shape)
-            print("label shape", labels.shape)
+            # print("input shape:", inputs.shape)
+            # print("label shape", labels.shape)
 
             # TODO: Updating network
+            print("Updating network.")
             logits, feat, base = x3d(inputs)
 
             logits = logits.squeeze(2) # B C
@@ -415,7 +425,11 @@ def run_with_feedback(root=TA2_ROOT,
                 pass
 
             else:
+                progress_bar = pkbar.Pbar(name="Testing the whole validation set:",
+                                        target=len(val_dataloader))
+
                 for k, data in enumerate(val_dataloader):
+                    progress_bar.update(k)
                     inputs, labels = data
 
                     b, n, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
@@ -438,10 +452,6 @@ def run_with_feedback(root=TA2_ROOT,
 
                 val_map = val_apm.value().mean()
                 print('Epoch (testing after updating the network):{} val mAP: {:.4f}'.format(epochs, val_map))
-
-
-
-
 
 
         else:

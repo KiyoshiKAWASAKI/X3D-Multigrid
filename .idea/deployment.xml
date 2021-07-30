@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="CRC" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="tellurak" autoUploadExternalChanges="true">
     <serverData>
-      <paths name="CRC">
+      <paths name="tellurak">
         <serverdata>
           <mappings>
-            <mapping deploy="/Public/darpa_sail_on/X3D-Multigrid" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/research/X3D-Multigrid" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

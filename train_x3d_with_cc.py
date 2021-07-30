@@ -225,9 +225,7 @@ val_dataloader = torch.utils.data.DataLoader(val_dataset,
 def run(init_lr,
         max_epochs,
         batch_size):
-    """
 
-    """
     print("[INFO] There are %d training batches and %d validation batches"
           % (len(train_dataloader), len(val_dataloader)))
     print("[INFO] Initial learning rate: %f" % init_lr)

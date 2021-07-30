@@ -155,19 +155,16 @@ def run(root,
         inputs = inputs.cuda() # B 3 T W H
         # labels = labels.cuda() # B C
 
+        # TODO: Use feat instead of logits
         with torch.no_grad():
             logits, feat, base = x3d(inputs)
 
-        logits = logits.squeeze(2) # B C
-        logits = logits.view(b,n,logits.shape[1])
-        # This logits after max is what we want
-        logits = torch.max(logits, dim=1)[0]
-        # Logits shape: [batch_size, nb_classes]
+        print(feat.shape)
 
         # TODO: Append each result into list
-        for j in range(logits.shape[0]):
-            one_logit = logits[j, :]
-            all_features_list.append(one_logit.tolist())
+        for j in range(feat.shape[0]):
+            one_feature = feat[j, :]
+            all_features_list.append(one_feature.tolist())
 
         print("one feature", len(all_features_list[0]))
 
@@ -194,8 +191,8 @@ run(root=hmdb51_base_dir,
     split='training',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_train_known_feature.npy",
-    label_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_train_known_label.npy")
+    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_train_known_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_train_known_label.npy")
 
 # HMDB51: test known feedback
 run(root=hmdb51_base_dir,
@@ -204,8 +201,8 @@ run(root=hmdb51_base_dir,
     split='feedback_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_known_feedback_feature.npy",
-    label_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_known_feedback_label.npy")
+    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_feedback_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_feedback_label.npy")
 
 # HMDB51: test known valid
 run(root=hmdb51_base_dir,
@@ -214,8 +211,8 @@ run(root=hmdb51_base_dir,
     split='test_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_known_valid_feature.npy",
-    label_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_known_valid_label.npy")
+    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_valid_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_valid_label.npy")
 
 # HMDB51: training
 run(root=hmdb51_base_dir,
@@ -224,8 +221,8 @@ run(root=hmdb51_base_dir,
     split='feedback_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_unknown_feedback_feature.npy",
-    label_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_unknown_feedback_label.npy")
+    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_feedback_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_feedback_label.npy")
 
 # HMDB51: training
 run(root=hmdb51_base_dir,
@@ -234,8 +231,8 @@ run(root=hmdb51_base_dir,
     split='test_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_unknown_valid_feature.npy",
-    label_save_path="/data/jin.huang/hmdb51/npy_json/0/evm_npy/hmdb_test_unknown_valid_label.npy")
+    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_valid_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_valid_label.npy")
 
 
 ##################################################################
@@ -245,9 +242,9 @@ run(root=ucf101_base_dir,
     batch_size=BS*BS_UPSCALE,
     split='training',
     trained_model_path=ucf_model_path,
-    nb_classes=88,
-    feature_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_train_known_feature.npy",
-    label_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_train_known_label.npy")
+    nb_classes=51,
+    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_train_known_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_train_known_label.npy")
 
 # UCF101: test known feedback
 run(root=ucf101_base_dir,
@@ -255,9 +252,9 @@ run(root=ucf101_base_dir,
     batch_size=BS*BS_UPSCALE,
     split='feedback_set',
     trained_model_path=ucf_model_path,
-    nb_classes=88,
-    feature_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_known_feedback_feature.npy",
-    label_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_known_feedback_label.npy")
+    nb_classes=51,
+    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_feedback_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_feedback_label.npy")
 
 # UCF101: test known valid
 run(root=ucf101_base_dir,
@@ -265,9 +262,9 @@ run(root=ucf101_base_dir,
     batch_size=BS*BS_UPSCALE,
     split='test_set',
     trained_model_path=ucf_model_path,
-    nb_classes=88,
-    feature_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_known_valid_feature.npy",
-    label_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_known_valid_label.npy")
+    nb_classes=51,
+    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_valid_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_valid_label.npy")
 
 # UCF101: training
 run(root=ucf101_base_dir,
@@ -275,9 +272,9 @@ run(root=ucf101_base_dir,
     batch_size=BS*BS_UPSCALE,
     split='feedback_set',
     trained_model_path=ucf_model_path,
-    nb_classes=88,
-    feature_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_unknown_feedback_feature.npy",
-    label_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_unknown_feedback_label.npy")
+    nb_classes=51,
+    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_feedback_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_feedback_label.npy")
 
 # UCF101: training
 run(root=ucf101_base_dir,
@@ -285,6 +282,6 @@ run(root=ucf101_base_dir,
     batch_size=BS*BS_UPSCALE,
     split='test_set',
     trained_model_path=ucf_model_path,
-    nb_classes=88,
-    feature_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_unknown_valid_feature.npy",
-    label_save_path="/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/evm_npy/ucf_101_test_unknown_valid_label.npy")
+    nb_classes=51,
+    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_valid_feature.npy",
+    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_valid_label.npy")
