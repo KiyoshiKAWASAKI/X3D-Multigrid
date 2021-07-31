@@ -43,7 +43,7 @@ GPUS = 1
 X3D_VERSION = 'M'
 
 ###############################
-dataset_used = "hmdb"
+dataset_used = "ucf101"
 test_known = True
 use_feedback = True
 threshold = 0.6
@@ -51,7 +51,7 @@ threshold = 0.6
 update_fre = 4
 #################################
 if dataset_used == "ucf101":
-    pass
+    # TODO: for kitware machine
     # TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
     # trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
     # nb_classes = 88
@@ -74,27 +74,92 @@ if dataset_used == "ucf101":
     #         TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_feedback.json'
     #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
 
-else:
-    trainining_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_10_folds_partition_0.json"
-    TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
-    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
-    nb_classes = 26
+    # TODO: for nd crc
+    trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                           "ucf101_npy_json/ta2_10_folds/0_crc/ta2_10_folds_partition_0.json"
+    TA2_ROOT = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc'
+    trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
+                         "/models/x3d/thresholding/0729_ucf/x3d_ta2_rgb_sgd_best.pt"
+    nb_classes = 51
 
     if test_known == True:
         if use_feedback == False:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
+            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+        else:
+            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
+            TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
+                           'ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_feedback.json'
+            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+
+    else:
+        if use_feedback == False:
+            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
+            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+        else:
+            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
+            TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                           '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_feedback.json'
+            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+
+
+else:
+    nb_classes = 26
+
+    # TODO: for kitware
+    # trainining_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_10_folds_partition_0.json"
+    # TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
+    # trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+
+    # if test_known == True:
+    #     if use_feedback == False:
+    #         TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+    #     else:
+    #         TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+    #         TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+    # else:
+    #     if use_feedback == False:
+    #         TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+    #     else:
+    #         TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+    #         TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+
+    # TODO: For CRC
+    trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/" \
+                           "0_crc/ta2_10_folds_partition_0.json"
+    TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
+    trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/" \
+                         "x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+
+    if test_known == True:
+        if use_feedback == False:
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
+                       "/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                           "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
     else:
         if use_feedback == False:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                           "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
 
 
@@ -155,7 +220,7 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
     epochs = load_ckpt['scheduler_state_dict']['last_epoch']
 
     print ('-' * 10)
-    bar_st = val_iterations_per_epoch
+    bar_st = len(val_dataloader)
     bar = pkbar.Pbar(name='evaluating: ', target=bar_st)
     x3d.train(False)  # Set model to evaluate mode
     _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS\
@@ -164,26 +229,18 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
         print("Testing unknown. Threshold %f" % threshold)
         count_correct = 0
         count_wrong = 0
-        sm = torch.nn.Softmax(dim=1)
+
+    sm = torch.nn.Softmax(dim=1)
 
 
     # Iterate over data.
-    # for i in range(len(val_dataloader)):
     for i, data in enumerate(val_dataloader):
-        # bar.update(i)
-        # print(i)
-        # try:
-        inputs, labels = next(iter(val_dataloader))
-            # print(inputs.shape)
-        # except Exception as e:
-        #     print(e)
-        #     continue
+        bar.update(i)
 
-        b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
+        inputs, labels = data
+
+        b,n,c,t,h,w = inputs.shape
         inputs = inputs.view(b*n,c,t,h,w)
-
-        # b, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
-        # inputs = inputs.view(b , c, t, h, w)
 
         inputs = inputs.cuda() # B 3 T W H
         labels = labels.cuda() # B C
@@ -192,20 +249,23 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
             logits, feat, base = x3d(inputs)
 
         logits = logits.squeeze(2) # B C
-        logits = logits.view(b,n,logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
-        # logits = logits.view(b, logits.shape[1]) # FOR MULTIPLE TEMPORAL CROPS
-        # pdb.set_trace()
+        logits = logits.view(b,n,logits.shape[1])
+
         probs = F.sigmoid(logits)
-        #probs = torch.mean(probs, 1)
-        #logits = torch.mean(logits, 1)
         probs = torch.max(probs, dim=1)[0]
+
+        # print(sm(probs))
+
         logits = torch.max(logits, dim=1)[0]
+
 
         # Shape of probs: [batch_size, nb_classes]
 
         if test_known == False:
             # TODO: Get max probability for each sample
             probs_sm = sm(probs)
+
+            # print(probs_sm)
 
             for one_prob in probs_sm:
                 max_prob = torch.max(one_prob)
@@ -217,7 +277,7 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
 
             print("Update - Correct: %d. Wrong: %d" % (count_correct, count_wrong))
 
-        if test_known:
+        else:
             val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
     if test_known:
@@ -232,11 +292,11 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
 
 
 
-def run_with_feedback(root=TA2_ROOT,
-                      anno=TA2_ANNO,
-                      feedback_file=TA2_FEEDBACK,
-                      batch_size=BS*BS_UPSCALE,
-                      init_lr=INIT_LR):
+def run_with_feedback(root,
+                      anno,
+                      feedback_file,
+                      batch_size,
+                      init_lr):
 
     frames=80 # DOUBLED INSIDE DATASET, AS LONGER CLIPS
     crop_size = {'S':160, 'M':224, 'XL':312}[X3D_VERSION]
@@ -469,5 +529,9 @@ if __name__ == '__main__':
         run()
 
     else:
-        run_with_feedback()
+        run_with_feedback(root=TA2_ROOT,
+                          anno=TA2_ANNO,
+                          feedback_file=TA2_FEEDBACK,
+                          batch_size=BS*BS_UPSCALE,
+                          init_lr=INIT_LR)
         # pass
