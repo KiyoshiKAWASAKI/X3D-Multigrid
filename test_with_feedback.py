@@ -49,7 +49,7 @@ BS_UPSCALE = 2
 INIT_LR = 0.00005 * BS_UPSCALE
 GPUS = 1
 
-dataset_used = "ucf101"
+dataset_used = "hmdb51"
 test_known = True
 use_feedback = True
 update_with_train = True
@@ -68,68 +68,114 @@ TA2_STD = [1, 1, 1]
 if dataset_used == "ucf101":
     nb_classes = 51
 
-    trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-                           "ucf101_npy_json/ta2_10_folds/0_crc/ta2_10_folds_partition_0.json"
-    TA2_ROOT = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc'
-    trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
-                         "/models/x3d/thresholding/0729_ucf/x3d_ta2_rgb_sgd_best.pt"
+    # TODO: for kitware
+    training_json_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json"
+    TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
 
     if test_known == True:
         if use_feedback == False:
-            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
+            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
             TA2_DATASET_SIZE = {'train': None, 'val': 1026}
         else:
-            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
-            TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
-                           'ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_feedback.json'
+            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
+            TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_feedback.json'
             TA2_DATASET_SIZE = {'train': None, 'val': 1026}
 
     else:
         if use_feedback == False:
-            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
+            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
             TA2_DATASET_SIZE = {'train': None, 'val': 1026}
         else:
-            TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
-            TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-                           '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_feedback.json'
+            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
+            TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_feedback.json'
             TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+
+    # trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+    #                        "ucf101_npy_json/ta2_10_folds/0_crc/ta2_10_folds_partition_0.json"
+    # TA2_ROOT = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc'
+    # trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
+    #                      "/models/x3d/thresholding/0729_ucf/x3d_ta2_rgb_sgd_best.pt"
+    #
+    # if test_known == True:
+    #     if use_feedback == False:
+    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    #     else:
+    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
+    #         TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
+    #                        'ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_feedback.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    #
+    # else:
+    #     if use_feedback == False:
+    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+    #     else:
+    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
+    #         TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+    #                        '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_feedback.json'
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
 
 
 else:
     nb_classes = 26
 
-    trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/" \
-                           "0_crc/ta2_10_folds_partition_0.json"
-    TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
-    trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/" \
-                         "x3d/thresholding/0802_hmdb/x3d_ta2_rgb_sgd_best.pt"
+    # TODO: for kitware
+    training_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_10_folds_partition_0.json"
+    TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
+    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
 
     if test_known == True:
         if use_feedback == False:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
-                       "/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
-            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-                           "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
+
     else:
         if use_feedback == False:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
         else:
-            TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-            TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-                           "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
             TA2_DATASET_SIZE = {'train': None, 'val': 464}
+
+    # trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/" \
+    #                        "0_crc/ta2_10_folds_partition_0.json"
+    # TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
+    # trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/" \
+    #                      "x3d/thresholding/0802_hmdb/x3d_ta2_rgb_sgd_best.pt"
+    #
+    # if test_known == True:
+    #     if use_feedback == False:
+    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+    #                    "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+    #     else:
+    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
+    #                    "/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+    #         TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+    #                        "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+    # else:
+    #     if use_feedback == False:
+    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+    #                    "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+    #     else:
+    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+    #                    "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+    #         TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+    #                        "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
+    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
 
 
 ##################################################################
@@ -158,7 +204,7 @@ def run(init_lr,
                                         ToTensor(255),
                                         Normalize(TA2_MEAN, TA2_STD)])
     # Training data loader
-    train_dataset = UCF101(split_file=trainining_json_path,
+    train_dataset = UCF101(split_file=training_json_path,
                            split='training',
                            root=root,
                            num_classes=nb_classes,
@@ -275,7 +321,17 @@ def run(init_lr,
             print("Updating network.")
             logits, _, _ = x3d(inputs)
             logits = logits.squeeze(2)
-            # probs = F.sigmoid(logits)
+
+            if update_with_train:
+                logits = logits.view(b_fb, n_fb, logits.shape[1])
+            else:
+                logits = logits.view(b_fb*2, n_fb, logits.shape[1])
+
+            logits = torch.max(logits, dim=1)[0]
+
+            # print(inputs.shape)
+            # print(labels.shape)
+            # print(logits.shape)
 
             loss = criterion(logits, labels)
             loss.backward()
@@ -311,7 +367,7 @@ def run(init_lr,
                 val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
             val_map = val_apm.value().mean()
-            print('Epoch (testing):{} val mAP: {:.4f}'.format(epochs, val_map))
+            print('Epoch (testing):val mAP: {:.4f}'.format(val_map))
 
         else:
             continue

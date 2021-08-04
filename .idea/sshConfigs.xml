@@ -7,6 +7,9 @@
       <sshConfig authType="PASSWORD" connectionConfig="{&quot;serverAliveInterval&quot;:300}" host="crcfe02.crc.nd.edu" id="d3d05f89-e314-467f-9213-c2f0280eef0c" port="22" customName="CRC" nameFormat="CUSTOM">
         <option name="customName" value="CRC" />
       </sshConfig>
+      <sshConfig authType="PASSWORD" connectionConfig="{&quot;serverAliveInterval&quot;:300}" host="tellurak.kitware.com" id="5c6221f6-b148-447a-bfa0-e1e3fa72bdde" port="22" customName="tellurak" nameFormat="CUSTOM" username="jin.huang">
+        <option name="customName" value="tellurak" />
+      </sshConfig>
     </configs>
   </component>
 </project>
