@@ -36,18 +36,19 @@ os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
-BS = 2
+BS = 4
 BS_UPSCALE = 2
-INIT_LR = 0.005 * BS_UPSCALE
+INIT_LR = 0.00001 * BS_UPSCALE
 GPUS = 1
 X3D_VERSION = 'M'
 
 ###############################
-dataset_used = "ucf101"
+dataset_used = "hmdb51"
 test_known = True
 use_feedback = True
-threshold = 0.6
+update_with_train = True
 
+threshold = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10]
 update_fre = 4
 #################################
 if dataset_used == "ucf101":
@@ -137,7 +138,7 @@ else:
                            "0_crc/ta2_10_folds_partition_0.json"
     TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
     trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/" \
-                         "x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+                         "x3d/thresholding/0802_hmdb/x3d_ta2_rgb_sgd_best.pt"
 
     if test_known == True:
         if use_feedback == False:
@@ -207,8 +208,6 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
                                     dropout=0.5,
                                     base_bn_splits=1)
 
-    val_iterations_per_epoch = len(val_dataloader)
-
     load_ckpt = torch.load(trained_model_path)
     x3d.load_state_dict(load_ckpt['model_state_dict'])
 
@@ -225,69 +224,70 @@ def run(root=TA2_ROOT, anno=TA2_ANNO,batch_size=BS*BS_UPSCALE):
     x3d.train(False)  # Set model to evaluate mode
     _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS\
 
-    if test_known == False:
-        print("Testing unknown. Threshold %f" % threshold)
-        count_correct = 0
-        count_wrong = 0
-
     sm = torch.nn.Softmax(dim=1)
 
 
     # Iterate over data.
-    for i, data in enumerate(val_dataloader):
-        bar.update(i)
+    for one_thresh in threshold:
+        pred_nb_known = 0
+        pred_nb_unknown = 0
+        print("Testing with threshold ", one_thresh)
 
-        inputs, labels = data
+        for i, data in enumerate(val_dataloader):
+            bar.update(i)
 
-        b,n,c,t,h,w = inputs.shape
-        inputs = inputs.view(b*n,c,t,h,w)
+            inputs, labels = data
 
-        inputs = inputs.cuda() # B 3 T W H
-        labels = labels.cuda() # B C
+            b,n,c,t,h,w = inputs.shape
+            inputs = inputs.view(b*n,c,t,h,w)
 
-        with torch.no_grad():
-            logits, feat, base = x3d(inputs)
+            inputs = inputs.cuda() # B 3 T W H
+            labels = labels.cuda() # B C
 
-        logits = logits.squeeze(2) # B C
-        logits = logits.view(b,n,logits.shape[1])
+            with torch.no_grad():
+                logits, feat, base = x3d(inputs)
 
-        probs = F.sigmoid(logits)
-        probs = torch.max(probs, dim=1)[0]
+            logits = logits.squeeze(2) # B C
+            logits = logits.view(b,n,logits.shape[1])
 
-        # print(sm(probs))
+            probs = F.sigmoid(logits)
+            probs = torch.max(probs, dim=1)[0]
+            logits = torch.max(logits, dim=1)[0]
 
-        logits = torch.max(logits, dim=1)[0]
+            # Shape of probs: [batch_size, nb_classes]
 
-
-        # Shape of probs: [batch_size, nb_classes]
-
-        if test_known == False:
             # TODO: Get max probability for each sample
             probs_sm = sm(probs)
-
-            # print(probs_sm)
 
             for one_prob in probs_sm:
                 max_prob = torch.max(one_prob)
 
-                if max_prob > threshold:
-                    count_wrong += 1
-                else:
-                    count_correct += 1
+                # print(max_prob)
 
-            print("Update - Correct: %d. Wrong: %d" % (count_correct, count_wrong))
+                if max_prob > one_thresh:
+                    pred_nb_known += 1
+                else:
+                    pred_nb_unknown += 1
+
+            if test_known:
+                val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+
+        nb_total = pred_nb_known + pred_nb_unknown
+
+        if test_known:
+            val_map = val_apm.value().mean()
+            print ("Known mAP: {:.4f}".format(val_map))
+            print("Total samples: %d" % nb_total)
+            print("Predicted as known: %d" % pred_nb_known)
+            print("Predicted as unknown: %d" % pred_nb_unknown)
+            print("*" * 30)
 
         else:
-            val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+            print("Total samples: %d" % nb_total)
+            print("Predicted as known: %d" % pred_nb_known)
+            print("Predicted as unknown: %d" % pred_nb_unknown)
+            print("*" * 30)
 
-    if test_known:
-        val_map = val_apm.value().mean()
-        print ('Epoch:{} val mAP: {:.4f}'.format(epochs, val_map))
-    else:
-        print("Total unknown samples: %d" % (count_correct + count_wrong))
-        print("Unknown as unknown: %d" % count_correct)
-        print("Unknown as known: %d" % count_wrong)
-        print("Accuracy: %f" % (float(count_correct)/(float(count_correct+count_wrong))))
 
 
 
@@ -344,7 +344,7 @@ def run_with_feedback(root,
     val_dataloader = torch.utils.data.DataLoader(val_dataset,
                                                  batch_size=batch_size // 2,
                                                  shuffle=False,
-                                                 num_workers=0,
+                                                 num_workers=4,
                                                  pin_memory=True)
 
     # TODO: here is the dataloader for getting feedback data
@@ -378,39 +378,36 @@ def run_with_feedback(root,
 
     x3d.cuda()
 
-    # TODO: Get the names of all layers
-    all_layer_names = []
-    for name, layer in x3d.named_modules():
-        all_layer_names.append(name)
+    # # TODO: Get the names of all layers
+    # all_layer_names = []
+    # for name, layer in x3d.named_modules():
+    #     all_layer_names.append(name)
+    #
+    # # print(all_layer_names)
+    #
+    # # TODO: freeze some layers
+    # # no_requires_grad(model=x3d, fixed_layer_names=all_layer_names[0])
+    #
+    # params = x3d.state_dict()
+    # # print(params.keys())
+    # keys = list(params.keys())
+    #
+    # for name, param in x3d.named_parameters():
+    #     if param.requires_grad and \
+    #             name != "fc2.weight" and name != "fc2.bias" \
+    #             and name != "fc1.weight":
+    #         param.requires_grad = False
 
-    # print(all_layer_names)
-
-    # TODO: freeze some layers
-    # no_requires_grad(model=x3d, fixed_layer_names=all_layer_names[0])
-
-    params = x3d.state_dict()
-    # print(params.keys())
-    keys = list(params.keys())
-
-    for name, param in x3d.named_parameters():
-        if param.requires_grad and \
-                name != "fc2.weight" and name != "fc2.bias" \
-                and name != "fc1.weight":
-            param.requires_grad = False
-            # print(name)
-
-    # sys.exit()
 
 
     x3d = nn.DataParallel(x3d)
     print('model loaded')
 
     val_apm = APMeter()
-    feedback_apm = APMeter()
     epochs = load_ckpt['scheduler_state_dict']['last_epoch']
 
     print ('-' * 10)
-    bar_st = val_iterations_per_epoch
+    bar_st = len(val_dataloader)
     bar = pkbar.Pbar(name='Fine-tuning using feedback ', target=bar_st)
     # x3d.train(False)  # Set model to evaluate mode
     # _ = x3d.module.aggregate_sub_bn_stats() # FOR EVAL AGGREGATE BN STATS
@@ -418,14 +415,15 @@ def run_with_feedback(root,
     lr = init_lr
     print('INIT LR: %f' % lr)
 
-    # optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
-    optimizer = optim.SGD(filter(lambda p: p.requires_grad, x3d.parameters()), lr=lr, momentum=0.9, weight_decay=1e-5)
-    # lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
+    optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
+    # optimizer = optim.SGD(filter(lambda p: p.requires_grad, x3d.parameters()), lr=lr, momentum=0.9, weight_decay=1e-5)
+    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
 
-    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCEWithLogitsLoss()
     x3d.train(True)
+    # x3d.train(False)
     torch.autograd.set_grad_enabled(True)
-    optimizer.zero_grad()
+    # optimizer.zero_grad()
 
 
     # Iterate over data.
@@ -447,38 +445,48 @@ def run_with_feedback(root,
         # TODO: Just update the network every 4 steps
         if (i == 3) or (i % 4 == 3):
             # Get data from training set and feedback set
-            b_fb, n_fb, c_fb, t_fb, h_fb, w_fb = data_feedback.shape
-            data_feedback = data_feedback.view(b_fb * n_fb, c_fb, t_fb, h_fb, w_fb)
-
-            b_train, n_train, c_train, t_train, h_train, w_train = data_train.shape
-            data_train = data_train.view(b_train * n_train, c_train, t_train, h_train, w_train)
-
-            # Stack the input and use it to update the network
-            inputs = torch.cat((data_feedback, data_train), dim=0)
-            labels = torch.cat((labels_feedback, labels_train), dim=0)
-
-            inputs = inputs.cuda()
-            labels = labels.cuda()
-
-            # print("input shape:", inputs.shape)
-            # print("label shape", labels.shape)
-
-            # TODO: Updating network
-            print("Updating network.")
-            logits, feat, base = x3d(inputs)
-
-            logits = logits.squeeze(2) # B C
-            logits = logits.view(b_fb*2, n_fb, logits.shape[1])
-            logits = torch.max(logits, dim=1)[0]
-            probs = F.sigmoid(logits)
-
-
-            loss = criterion(logits, labels)
-            total_loss += loss.item()
-            loss.requres_grad = True
-            loss.backward()
-
-            feedback_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+            # b_fb, n_fb, c_fb, t_fb, h_fb, w_fb = data_feedback.shape
+            # data_feedback = data_feedback.view(b_fb * n_fb, c_fb, t_fb, h_fb, w_fb)
+            #
+            # b_train, n_train, c_train, t_train, h_train, w_train = data_train.shape
+            # data_train = data_train.view(b_train * n_train, c_train, t_train, h_train, w_train)
+            #
+            # if update_with_train:
+            #
+            #     inputs = data_train
+            #     labels = labels_train
+            #
+            # else:
+            #
+            #     # Stack the input and use it to update the network
+            #     inputs = torch.cat((data_feedback, data_train), dim=0)
+            #     labels = torch.cat((labels_feedback, labels_train), dim=0)
+            #
+            # inputs = inputs.cuda()
+            # labels = labels.cuda()
+            #
+            # # print("input shape:", inputs.shape)
+            # # print("label shape", labels.shape)
+            #
+            # # TODO: Updating network
+            # print("Updating network.")
+            # logits, feat, base = x3d(inputs)
+            #
+            # logits = logits.squeeze(2) # B C
+            # if update_with_train:
+            #     logits = logits.view(b_fb, n_fb, logits.shape[1])
+            # else:
+            #     logits = logits.view(b_fb*2, n_fb, logits.shape[1])
+            # logits = torch.max(logits, dim=1)[0]
+            # probs = F.sigmoid(logits)
+            #
+            #
+            # loss = criterion(logits, labels)
+            # total_loss += loss.item()
+            # loss.requres_grad = True
+            # loss.backward()
+            #
+            # feedback_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
             # TODO: Do test here
             if test_known == False:
@@ -503,8 +511,8 @@ def run_with_feedback(root,
 
                     logits = logits.squeeze(2)  # B C
                     logits = logits.view(b, n, logits.shape[1])
-                    probs = F.sigmoid(logits)
 
+                    probs = F.sigmoid(logits)
                     probs = torch.max(probs, dim=1)[0]
                     logits = torch.max(logits, dim=1)[0]
 

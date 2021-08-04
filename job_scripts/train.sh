@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N train_ucf_51_classes
+#$ -N train_hmdb_0802
 
 # Required modules
 module load conda

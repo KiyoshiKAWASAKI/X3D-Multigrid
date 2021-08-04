@@ -39,8 +39,8 @@ X3D_VERSION = 'M'
 
 ##################################################################
 # UCF 101
-ucf101_base_dir = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/"
-ucf_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
+ucf101_base_dir = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc/"
+ucf_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/x3d/thresholding/0729_ucf/x3d_ta2_rgb_sgd_best.pt"
 
 # Training and validation set for training phase
 ucf_101_train_known_json_path = ucf101_base_dir + "ta2_10_folds_partition_0.json"
@@ -52,11 +52,11 @@ ucf_101_test_unknown_valid_json = ucf101_base_dir + "ta2_partition_0_test_unknow
 ucf_101_test_unknown_feedback_json = ucf101_base_dir + "ta2_partition_0_test_unknown_feedback.json"
 
 # HMDB 51
-hmdb51_base_dir = "/data/jin.huang/hmdb51/npy_json/0/"
-hmdb_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+hmdb51_base_dir = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc/"
+hmdb_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
 
 # Training and validation set for training phase
-hmdb51_train_known_json_path = hmdb51_base_dir + "ta2_partition_0.json"
+hmdb51_train_known_json_path = hmdb51_base_dir + "ta2_10_folds_partition_0.json"
 
 # Test set (feedbackset + validation set)
 hmdb51_test_known_valid_json_path = hmdb51_base_dir + "ta2_partition_0_test_known_test.json"
@@ -146,7 +146,7 @@ def run(root,
         for i in range(labels.shape[0]):
             one_hot_label = labels[i, :]
             one_label = torch.argmax(one_hot_label)
-            print(one_label)
+            # print(one_label)
             all_labels_list.append(one_label.item())
 
         b,n,c,t,h,w = inputs.shape # FOR MULTIPLE TEMPORAL CROPS
@@ -159,14 +159,19 @@ def run(root,
         with torch.no_grad():
             logits, feat, base = x3d(inputs)
 
-        print(feat.shape)
+            # print(feat.shape)
+
+            feat = feat.view(b,n,feat.shape[1])
+
+        # print("shape of the labels", labels.shape)
+        # print("shape of the feature", feat.shape)
 
         # TODO: Append each result into list
         for j in range(feat.shape[0]):
             one_feature = feat[j, :]
             all_features_list.append(one_feature.tolist())
 
-        print("one feature", len(all_features_list[0]))
+        # print("All feature", len(all_features_list[0]))
 
     #TODO: Convert labels into numpy
     all_label_np = np.asarray(all_labels_list)
@@ -191,8 +196,8 @@ run(root=hmdb51_base_dir,
     split='training',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_train_known_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_train_known_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_train_known_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_train_known_label.npy")
 
 # HMDB51: test known feedback
 run(root=hmdb51_base_dir,
@@ -201,8 +206,8 @@ run(root=hmdb51_base_dir,
     split='feedback_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_feedback_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_feedback_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_known_feedback_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_known_feedback_label.npy")
 
 # HMDB51: test known valid
 run(root=hmdb51_base_dir,
@@ -211,8 +216,8 @@ run(root=hmdb51_base_dir,
     split='test_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_valid_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_known_valid_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_known_valid_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_known_valid_label.npy")
 
 # HMDB51: training
 run(root=hmdb51_base_dir,
@@ -221,8 +226,8 @@ run(root=hmdb51_base_dir,
     split='feedback_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_feedback_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_feedback_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_unknown_feedback_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_unknown_feedback_label.npy")
 
 # HMDB51: training
 run(root=hmdb51_base_dir,
@@ -231,8 +236,8 @@ run(root=hmdb51_base_dir,
     split='test_set',
     trained_model_path=hmdb_model_path,
     nb_classes=26,
-    feature_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_valid_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/hmdb_ta2/0730/hmdb_test_unknown_valid_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_unknown_valid_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/hmdb51_ta2/hmdb_test_unknown_valid_label.npy")
 
 
 ##################################################################
@@ -243,8 +248,8 @@ run(root=ucf101_base_dir,
     split='training',
     trained_model_path=ucf_model_path,
     nb_classes=51,
-    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_train_known_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_train_known_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_train_known_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_train_known_label.npy")
 
 # UCF101: test known feedback
 run(root=ucf101_base_dir,
@@ -253,8 +258,8 @@ run(root=ucf101_base_dir,
     split='feedback_set',
     trained_model_path=ucf_model_path,
     nb_classes=51,
-    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_feedback_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_feedback_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_known_feedback_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_known_feedback_label.npy")
 
 # UCF101: test known valid
 run(root=ucf101_base_dir,
@@ -263,8 +268,8 @@ run(root=ucf101_base_dir,
     split='test_set',
     trained_model_path=ucf_model_path,
     nb_classes=51,
-    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_valid_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_known_valid_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_known_valid_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_known_valid_label.npy")
 
 # UCF101: training
 run(root=ucf101_base_dir,
@@ -273,8 +278,8 @@ run(root=ucf101_base_dir,
     split='feedback_set',
     trained_model_path=ucf_model_path,
     nb_classes=51,
-    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_feedback_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_feedback_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_unknown_feedback_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_unknown_feedback_label.npy")
 
 # UCF101: training
 run(root=ucf101_base_dir,
@@ -283,5 +288,5 @@ run(root=ucf101_base_dir,
     split='test_set',
     trained_model_path=ucf_model_path,
     nb_classes=51,
-    feature_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_valid_feature.npy",
-    label_save_path="/data/jin.huang/evm/data/ucf101_ta2/0730/ucf_101_test_unknown_valid_label.npy")
+    feature_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_unknown_valid_feature.npy",
+    label_save_path="/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/evm/data/ucf101_ta2/ucf_101_test_unknown_valid_label.npy")
