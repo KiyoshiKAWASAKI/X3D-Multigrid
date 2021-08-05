@@ -34,7 +34,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpu', default='1', type=str)
+parser.add_argument('-gpu', default='0', type=str)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
@@ -44,138 +44,86 @@ os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
 ##################################################################
 # Hyper-parameters
 ##################################################################
-BS = 2
-BS_UPSCALE = 2
-INIT_LR = 0.00005 * BS_UPSCALE
-GPUS = 1
-
+work_machine = "kitware"
 dataset_used = "hmdb51"
 test_known = True
 use_feedback = True
 update_with_train = True
 
-threshold = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10]
+INIT_LR = 0.001
 update_fre = 4
 
 ##################################################################
-# Data and model path on CRC (No need to change this)
+# Hyper-parameters
 ##################################################################
-
+BS = 2
+GPUS = 1
+BS_UPSCALE = 2
 X3D_VERSION = 'M'
 TA2_MEAN = [0, 0, 0]
 TA2_STD = [1, 1, 1]
 
+##################################################################
+# Data and model path on CRC (No need to change this)
+##################################################################
+"""
+TA2_ANNO: test phase validation set for known samples
+TA2_FEEDBACK: test phase feedback set
+TA2_UNKNOWN: test phase validation set for unknown samples
+"""
 if dataset_used == "ucf101":
     nb_classes = 51
 
-    # TODO: for kitware
-    training_json_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json"
-    TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
-    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
+    if work_machine == "kitware":
+        training_json_path = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_10_folds_partition_0.json"
+        TA2_ROOT = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0'
+        trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_ucf/x3d_ta2_rgb_sgd_best.pt"
 
-    if test_known == True:
-        if use_feedback == False:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-        else:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
-            TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_feedback.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+        TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_test.json'
+        TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_known_feedback.json'
+        TA2_UNKNOWN = "/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_feedback.json"
 
     else:
-        if use_feedback == False:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-        else:
-            TA2_ANNO = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_test.json'
-            TA2_FEEDBACK = '/data/jin.huang/ucf101_npy_json/ta2_10_folds/0/ta2_partition_0_test_unknown_feedback.json'
-            TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+        trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                               "ucf101_npy_json/ta2_10_folds/0_crc/ta2_10_folds_partition_0.json"
+        TA2_ROOT = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc'
+        trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
+                             "/models/x3d/thresholding/0729_ucf/x3d_ta2_rgb_sgd_best.pt"
 
-    # trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-    #                        "ucf101_npy_json/ta2_10_folds/0_crc/ta2_10_folds_partition_0.json"
-    # TA2_ROOT = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/ucf101_npy_json/ta2_10_folds/0_crc'
-    # trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
-    #                      "/models/x3d/thresholding/0729_ucf/x3d_ta2_rgb_sgd_best.pt"
-    #
-    # if test_known == True:
-    #     if use_feedback == False:
-    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-    #     else:
-    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
-    #         TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
-    #                        'ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_feedback.json'
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-    #
-    # else:
-    #     if use_feedback == False:
-    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
-    #     else:
-    #         TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-    #                    '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_test.json'
-    #         TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
-    #                        '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_feedback.json'
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 1026}
+        TA2_ANNO = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                   '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_test.json'
+        TA2_FEEDBACK = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/' \
+                       'ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_known_feedback.json'
+        TA2_UNKNOWN = '/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship' \
+                       '/ucf101_npy_json/ta2_10_folds/0_crc/ta2_partition_0_test_unknown_feedback.json'
 
 
 else:
     nb_classes = 26
+    threshold = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10]
 
-    # TODO: for kitware
-    training_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_10_folds_partition_0.json"
-    TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
-    trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
+    if work_machine == "kitware":
+        training_json_path = "/data/jin.huang/hmdb51/npy_json/0/ta2_10_folds_partition_0.json"
+        TA2_ROOT = "/data/jin.huang/hmdb51/npy_json/0"
+        trained_model_path = "/data/jin.huang/models/x3d/thresholding/0702_hmdb/x3d_ta2_rgb_sgd_best.pt"
 
-    if test_known == True:
-        if use_feedback == False:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
-            TA2_DATASET_SIZE = {'train': None, 'val': 464}
-        else:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
-            TA2_DATASET_SIZE = {'train': None, 'val': 464}
+        TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_test.json"
+        TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_known_feedback.json"
+        TA2_UNKNOWN = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
 
     else:
-        if use_feedback == False:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0/ta2_partition_0_test_unknown_test.json"
-            TA2_DATASET_SIZE = {'train': None, 'val': 464}
-        else:
-            TA2_ANNO = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-            TA2_FEEDBACK = "/data/jin.huang/hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-            TA2_DATASET_SIZE = {'train': None, 'val': 464}
+        trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/" \
+                               "0_crc/ta2_10_folds_partition_0.json"
+        TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
+        trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/" \
+                             "x3d/thresholding/0802_hmdb/x3d_ta2_rgb_sgd_best.pt"
 
-    # trainining_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/" \
-    #                        "0_crc/ta2_10_folds_partition_0.json"
-    # TA2_ROOT = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/hmdb51/npy_json/0_crc"
-    # trained_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/models/" \
-    #                      "x3d/thresholding/0802_hmdb/x3d_ta2_rgb_sgd_best.pt"
-    #
-    # if test_known == True:
-    #     if use_feedback == False:
-    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-    #                    "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
-    #     else:
-    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
-    #                    "/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
-    #         TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-    #                        "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
-    # else:
-    #     if use_feedback == False:
-    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-    #                    "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
-    #     else:
-    #         TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-    #                    "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-    #         TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
-    #                        "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
-    #         TA2_DATASET_SIZE = {'train': None, 'val': 464}
+        TA2_ANNO = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship" \
+                   "/hmdb51/npy_json/0_crc/ta2_partition_0_test_known_test.json"
+        TA2_FEEDBACK = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_known_feedback.json"
+        TA2_UNKNOWN = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/kitware_internship/" \
+                       "hmdb51/npy_json/0_crc/ta2_partition_0_test_unknown_test.json"
 
 
 ##################################################################
@@ -184,7 +132,8 @@ else:
 def run(init_lr,
         root,
         anno,
-        feedback_file,
+        feedback_file_known,
+        test_unknown_file,
         batch_size=BS*BS_UPSCALE):
 
     frames=80 # DOUBLED INSIDE DATASET, AS LONGER CLIPS
@@ -208,7 +157,7 @@ def run(init_lr,
                            split='training',
                            root=root,
                            num_classes=nb_classes,
-                           spatial_transform=val_spatial_transforms,
+                           spatial_transform=train_spatial_transforms,
                            frames=80,
                            gamma_tau=gamma_tau,
                            crops=10,
@@ -221,7 +170,7 @@ def run(init_lr,
                                                    pin_memory=True)
 
     # Feedback data loader
-    feedback_dataset = UCF101(split_file=feedback_file,
+    feedback_dataset = UCF101(split_file=feedback_file_known,
                               split='feedback_set',
                               root=root,
                               num_classes=nb_classes,
@@ -237,8 +186,8 @@ def run(init_lr,
                                                       num_workers=4,
                                                       pin_memory=True)
 
-    # Test validation data loader
-    val_dataset = UCF101(split_file=anno,
+    # Test validation data loader - known
+    val_dataset_known = UCF101(split_file=anno,
                          split='test_set',
                          root=root,
                          num_classes=nb_classes,
@@ -248,15 +197,33 @@ def run(init_lr,
                          crops=10,
                          test_phase=True,
                          is_feedback=True)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset,
+    val_dataloader_known = torch.utils.data.DataLoader(val_dataset_known,
                                                  batch_size=batch_size // 2,
                                                  shuffle=False,
                                                  num_workers=4,
                                                  pin_memory=True)
 
-    ##################################################################
+    # Test validation data loader - unknown
+    val_dataset_unknown = UCF101(split_file=test_unknown_file,
+                               split='test_set',
+                               root=root,
+                               num_classes=nb_classes,
+                               spatial_transform=val_spatial_transforms,
+                               frames=80,
+                               gamma_tau=gamma_tau,
+                               crops=10,
+                               test_phase=True,
+                               is_feedback=True)
+    val_dataloader_unknown = torch.utils.data.DataLoader(val_dataset_unknown,
+                                                       batch_size=batch_size // 2,
+                                                       shuffle=False,
+                                                       num_workers=4,
+                                                       pin_memory=True)
+
+
+    #################################################
     # Update model
-    ##################################################################
+    #################################################
     # Use trained model
     x3d = resnet_x3d.generate_model(x3d_version=X3D_VERSION,
                                     n_classes=nb_classes,
@@ -265,24 +232,33 @@ def run(init_lr,
                                     base_bn_splits=1)
     load_ckpt = torch.load(trained_model_path)
     x3d.load_state_dict(load_ckpt['model_state_dict'])
-
     x3d.cuda()
+
+    # Freeze some layers
+    for name, param in x3d.named_parameters():
+        if param.requires_grad and \
+                name != "fc2.weight" and name != "fc2.bias" \
+                and name != "fc1.weight":
+            param.requires_grad = False
+
+    # Training setups
     x3d = nn.DataParallel(x3d)
-
-    lr = init_lr
-    print ('INIT LR: %f'%lr)
-
-
-    optimizer = optim.SGD(x3d.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
-    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
+    optimizer = optim.SGD(filter(lambda p: p.requires_grad, x3d.parameters()), lr=init_lr, momentum=0.9, weight_decay=1e-5)
     criterion = nn.BCEWithLogitsLoss()
     val_apm = APMeter()
 
+    sm = torch.nn.Softmax(dim=1)
 
-    # Update network and do test
+    # Update network/fine-tuning
     train_dataloader_iterator = iter(train_dataloader)
 
     for i, data in enumerate(feedback_dataloader):
+        if dataset_used == "hmdb51":
+            count_known_list = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+            count_unknown_list = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+        else:
+            pass
+
         data_feedback, labels_feedback = data
 
         try:
@@ -292,91 +268,143 @@ def run(init_lr,
             data_train, labels_train = next(train_dataloader_iterator)
 
         # Just update the network every 4 steps
-        if (i == 3) or (i % 4 == 3):
-            # TODO: set the model on training
-            x3d.train(True)
-            torch.autograd.set_grad_enabled(True)
-            optimizer.zero_grad()
+        # if (i == 3) or (i % 4 == 3):
+        x3d.train(True)
+        torch.autograd.set_grad_enabled(True)
+        optimizer.zero_grad()
 
-            # Get data from training set and feedback set
-            b_fb, n_fb, c_fb, t_fb, h_fb, w_fb = data_feedback.shape
-            data_feedback = data_feedback.view(b_fb * n_fb, c_fb, t_fb, h_fb, w_fb)
+        # Get data from training set and feedback set
+        b_fb, n_fb, c_fb, t_fb, h_fb, w_fb = data_feedback.shape
+        data_feedback = data_feedback.view(b_fb * n_fb, c_fb, t_fb, h_fb, w_fb)
 
-            b_train, n_train, c_train, t_train, h_train, w_train = data_train.shape
-            data_train = data_train.view(b_train * n_train, c_train, t_train, h_train, w_train)
+        b_train, n_train, c_train, t_train, h_train, w_train = data_train.shape
+        data_train = data_train.view(b_train * n_train, c_train, t_train, h_train, w_train)
 
-            # TODO: Get the data for training
-            if update_with_train:
-                inputs = data_train
-                labels = labels_train
+        if update_with_train:
+            inputs = data_train
+            labels = labels_train
+        else:
+            inputs = torch.cat((data_feedback, data_train), dim=0)
+            labels = torch.cat((labels_feedback, labels_train), dim=0)
 
-            else:
-                inputs = torch.cat((data_feedback, data_train), dim=0)
-                labels = torch.cat((labels_feedback, labels_train), dim=0)
+        inputs = inputs.cuda()
+        labels = labels.cuda()
 
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+        # TODO: Updating network
+        print("Updating network.")
+        logits, _, _ = x3d(inputs)
+        logits = logits.squeeze(2)
 
-            # TODO: Updating network
-            print("Updating network.")
-            logits, _, _ = x3d(inputs)
-            logits = logits.squeeze(2)
+        if update_with_train:
+            logits = logits.view(b_fb, n_fb, logits.shape[1])
+        else:
+            logits = logits.view(b_fb*2, n_fb, logits.shape[1])
 
-            if update_with_train:
-                logits = logits.view(b_fb, n_fb, logits.shape[1])
-            else:
-                logits = logits.view(b_fb*2, n_fb, logits.shape[1])
+        logits = torch.max(logits, dim=1)[0]
 
+        loss = criterion(logits, labels)
+        loss.backward()
+
+        #################################################
+        # Testing known samples
+        #################################################
+        # Switch to validation Mode
+        x3d.train(False)
+        _ = x3d.module.aggregate_sub_bn_stats()
+        torch.autograd.set_grad_enabled(False)
+
+        # TODO: Test known samples
+        progress_bar_known = pkbar.Pbar(name="Testing known:",
+                                  target=len(val_dataloader_known))
+
+        for k, data in enumerate(val_dataloader_known):
+            progress_bar_known.update(k)
+            inputs, labels = data
+
+            b, n, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
+            inputs = inputs.view(b * n, c, t, h, w)
+
+            inputs = inputs.cuda()  # B 3 T W H
+            labels = labels.cuda()  # B C
+
+            with torch.no_grad():
+                logits, feat, base = x3d(inputs)
+
+            logits = logits.squeeze(2)  # B C
+            logits = logits.view(b, n, logits.shape[1])
+
+            probs = F.sigmoid(logits)
+            probs = torch.max(probs, dim=1)[0]
             logits = torch.max(logits, dim=1)[0]
 
-            # print(inputs.shape)
-            # print(labels.shape)
-            # print(logits.shape)
+            # TODO: Get the probabilities
+            probs_sm = sm(probs)
 
-            loss = criterion(logits, labels)
-            loss.backward()
+            for one_prob in probs_sm:
+                max_prob = torch.max(one_prob)
+                # print(max_prob)
 
-            # TODO: Then, do validation
-            x3d.train(False)
-            _ = x3d.module.aggregate_sub_bn_stats()
-            torch.autograd.set_grad_enabled(False)
+                for t in range(len(threshold)):
+                    one_thresh = threshold[t]
 
-            progress_bar = pkbar.Pbar(name="Testing the whole validation set:",
-                                      target=len(val_dataloader))
+                    if max_prob > one_thresh:
+                        count_known_list[t][0] += 1
+                    else:
+                        count_known_list[t][1] += 1
 
-            for k, data in enumerate(val_dataloader):
-                progress_bar.update(k)
-                inputs, labels = data
+            val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
 
-                b, n, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
-                inputs = inputs.view(b * n, c, t, h, w)
+        val_map = val_apm.value().mean()
+        print("All counts:", count_known_list)
+        print('Epoch (testing):val mAP: {:.4f}'.format(val_map))
 
-                inputs = inputs.cuda()  # B 3 T W H
-                labels = labels.cuda()  # B C
+        #################################################
+        # Testing unknown samples
+        ################################################
+        progress_bar_unknown = pkbar.Pbar(name="Testing unknown:",
+                                        target=len(val_dataloader_unknown))
 
-                with torch.no_grad():
-                    logits, feat, base = x3d(inputs)
+        for k, data in enumerate(val_dataloader_unknown):
+            progress_bar_unknown.update(k)
+            inputs, labels = data
 
-                logits = logits.squeeze(2)  # B C
-                logits = logits.view(b, n, logits.shape[1])
+            b, n, c, t, h, w = inputs.shape  # FOR MULTIPLE TEMPORAL CROPS
+            inputs = inputs.view(b * n, c, t, h, w)
 
-                probs = F.sigmoid(logits)
-                probs = torch.max(probs, dim=1)[0]
-                logits = torch.max(logits, dim=1)[0]
+            inputs = inputs.cuda()  # B 3 T W H
 
-                val_apm.add(probs.detach().cpu().numpy(), labels.cpu().numpy())
+            with torch.no_grad():
+                logits, feat, base = x3d(inputs)
 
-            val_map = val_apm.value().mean()
-            print('Epoch (testing):val mAP: {:.4f}'.format(val_map))
+            logits = logits.squeeze(2)  # B C
+            logits = logits.view(b, n, logits.shape[1])
 
-        else:
-            continue
+            probs = F.sigmoid(logits)
+            probs = torch.max(probs, dim=1)[0]
+            logits = torch.max(logits, dim=1)[0]
 
+            # TODO: Get the probabilities
+            probs_sm = sm(probs)
+
+            for one_prob in probs_sm:
+                max_prob = torch.max(one_prob)
+                # print(max_prob)
+
+                for t in range(len(threshold)):
+                    one_thresh = threshold[t]
+
+                    if max_prob > one_thresh:
+                        count_unknown_list[t][0] += 1
+                    else:
+                        count_unknown_list[t][1] += 1
+
+        print("Unknown counts:", count_unknown_list)
 
 
 if __name__ == '__main__':
     run(root=TA2_ROOT,
-      anno=TA2_ANNO,
-      feedback_file=TA2_FEEDBACK,
-      batch_size=BS*BS_UPSCALE,
-      init_lr=INIT_LR)
+        anno=TA2_ANNO,
+        feedback_file_known=TA2_FEEDBACK,
+        test_unknown_file=TA2_UNKNOWN,
+        batch_size=BS*BS_UPSCALE,
+        init_lr=INIT_LR)
