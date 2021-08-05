@@ -3,19 +3,24 @@
   <component name="WebServers">
     <option name="servers">
       <webServer id="1332cf2a-f339-4249-92a8-01dcb7cd40b1" name="tellurak">
-        <fileTransfer host="tellurak.kitware.com" port="22" rootFolder="/home/local/KHQ/jin.huang" accessType="SFTP">
+        <fileTransfer rootFolder="/home/local/KHQ/jin.huang" accessType="SFTP" host="tellurak.kitware.com" port="22" sshConfigId="5c6221f6-b148-447a-bfa0-e1e3fa72bdde" sshConfig="tellurak">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
           </advancedOptions>
-          <option name="port" value="22" />
         </fileTransfer>
       </webServer>
       <webServer id="3257c461-8475-4492-8f32-cd25b0118884" name="CRC" url="http://crcfe02.crc.nd.edu">
-        <fileTransfer host="crcfe02.crc.nd.edu" port="22" rootFolder="/afs/crc.nd.edu/user/j/jhuang24" accessType="SFTP">
+        <fileTransfer rootFolder="/afs/crc.nd.edu/user/j/jhuang24" accessType="SFTP" host="crcfe02.crc.nd.edu" port="22" sshConfigId="d3d05f89-e314-467f-9213-c2f0280eef0c" sshConfig="CRC">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
           </advancedOptions>
-          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+      <webServer id="5d992ea1-9fcb-4ffb-8dcf-855697d94979" name="veydrus">
+        <fileTransfer accessType="SFTP" host="veydrus.kitware.com" port="22" sshConfigId="f65f588d-100d-4e0b-89a4-67acf417053e" sshConfig="jin.huang@veydrus.kitware.com:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
         </fileTransfer>
       </webServer>
     </option>
